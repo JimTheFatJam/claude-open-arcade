@@ -11,7 +11,7 @@ board games, all with the same 8-bit pixel-art look and an original chiptune sou
 | Minesweeper | Tetromino (falling blocks) | Chess |
 | 2048 | Snake | Checkers |
 | Sudoku | Maze Muncher (maze chase) | |
-| Meowdoku (cat Sudoku) | Brick Breaker | |
+| Meowdoku (cat logic puzzle) | Brick Breaker | |
 | Nonogram (Picross) | Paddle Ball (table tennis) | |
 | Flow Link (connect the dots) | Alien Invasion (fixed shooter) | |
 | Unblock (sliding blocks) | | |
@@ -22,10 +22,15 @@ rules and the gameplay feel stay faithful to the classics.
 
 Highlights:
 
-- **Fresh puzzles every time.** Sudoku and Meowdoku puzzles are generated on the device, and each
-  one is checked to have exactly one solution. Flow Link puzzles are built from a random path that
-  covers the whole board, so every one can be solved. Unblock boards are solved by a breadth-first
-  search, which tells you the true minimum number of moves (PAR).
+- **Fresh puzzles every time.** Sudoku puzzles are generated on the device and each one is
+  checked to have exactly one solution. Flow Link puzzles are built from a random path that covers
+  the whole board, so every one can be solved. Unblock boards are solved by a breadth-first search,
+  which tells you the true minimum number of moves (PAR).
+- **Meowdoku.** Place one cat in every row, column and colored region, and cats may never touch,
+  not even diagonally. Every puzzle has a unique solution that a built-in step-by-step logic solver
+  can reach without guessing. That solver also rates difficulty and powers the explained hints.
+  Boards grow from 5x5 to 9x9 as you win. You get 3 hearts, X marking (tap or drag), auto-X, undo
+  and clear, and an interactive tutorial.
 - **Real opponents.** Chess has a complete rules engine (castling, en passant, promotion,
   stalemate, threefold repetition, the 50-move rule and insufficient material). Its move generator
   is checked against the standard perft reference counts. The computer opponent uses alpha-beta
@@ -54,6 +59,13 @@ Highlights:
 - **Display:** portrait and landscape layouts (or lock one in Settings), optional CRT scanlines,
   vibration feedback, and a pixel dissolve between screens.
 
+## Phones and tablets
+
+Layouts are measured in "art pixels" of about 2.4dp (20% larger on tablets), so buttons and text
+keep a comfortable physical size on any screen. Wide screens (tablets, phones in landscape) get
+side-by-side layouts: two-column home, game menus, stats and awards; tutorials with the
+explanation next to the playable demo; and game boards centered with their controls beside them.
+
 ## Building
 
 Requirements: JDK 17+ and the Android SDK (API 34).
@@ -65,6 +77,12 @@ Requirements: JDK 17+ and the Android SDK (API 34).
 
 You can also open the project in Android Studio and press Run. The minimum supported version is
 Android 5.0 (API 21).
+
+Release signing: the `Release APK` workflow signs with the keystore given by the repository
+secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and
+`ANDROID_KEY_PASSWORD`. If they are missing, it falls back to a debug key. The CI workflow also
+renders screenshots of every screen on phone and tablet sizes and attaches them to the
+`ci-screenshots` pre-release.
 
 The app has **no runtime dependencies**. Graphics, the bitmap font, music and sound effects are all
 built on the Android framework, so the APK stays small and nothing ever needs downloading.
