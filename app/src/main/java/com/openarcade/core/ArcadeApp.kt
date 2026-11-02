@@ -88,7 +88,10 @@ class ArcadeApp(val context: Context, private val invalidate: () -> Unit) {
         // One art pixel is ~2.4dp, so components keep the same physical size on phones and
         // tablets; tablets simply get more room. Very small screens shrink to fit 150 pixels.
         val density = context.resources.displayMetrics.density
-        val byDensity = kotlin.math.round(density * 2.4f)
+        // tablets (smallest width >= 600dp) are viewed from further away: scale up 20%
+        val smallestDp = minOf(w, h) / density
+        val tabletBoost = if (smallestDp >= 600f) 1.2f else 1f
+        val byDensity = kotlin.math.round(density * 2.4f * tabletBoost)
         val byScreen = floor(minOf(w, h) / 150f)
         p = minOf(byDensity, byScreen).coerceAtLeast(2f)
         tBody = p

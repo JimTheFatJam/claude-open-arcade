@@ -95,6 +95,18 @@ object Gfx {
         return yy
     }
 
+    /** Like [paragraph] but stops before [maxY], ending with "..." if text was cut. */
+    fun paragraphClamped(c: Canvas, s: String, x: Float, y: Float, maxW: Float, size: Float, color: Int, maxY: Float) {
+        val chars = (maxW / (PixelFont.ADVANCE * size)).toInt()
+        val lines = PixelFont.wrap(s, chars)
+        val step = PixelFont.LINE * size
+        val fit = maxOf(1, ((maxY - y + (step - PixelFont.height(size))) / step).toInt())
+        for ((i, line0) in lines.take(fit).withIndex()) {
+            val line = if (i == fit - 1 && lines.size > fit) line0.take(maxOf(0, chars - 3)).trimEnd() + "..." else line0
+            text(c, line, x, y + i * step, size, color, Align.LEFT, Pal.withAlpha(Pal.BLACK, 200))
+        }
+    }
+
     fun paragraphHeight(s: String, maxW: Float, size: Float): Float {
         val chars = (maxW / (PixelFont.ADVANCE * size)).toInt()
         return PixelFont.wrap(s, chars).size * PixelFont.LINE * size

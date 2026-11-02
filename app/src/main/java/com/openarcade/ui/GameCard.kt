@@ -34,6 +34,11 @@ class GameCard(val def: GameDef, private val showStats: Boolean = true, onClick:
         Gfx.panel(c, r, if (pressed) Pal.BG3 else Pal.BG2, Pal.darker(def.accent, 0.1f), p, shadow = !pressed)
         // cartridge label stripe
         Gfx.rect(c, r.left + p * 2, r.top + p * 2, r.right - p * 2, r.top + p * 4, def.accent)
+        // very small cards (e.g. stats rows) show only the icon: the title sits beside them
+        if (r.height() < p * 32) {
+            def.icon.drawFit(c, RectF(r.left + p * 3, r.top + p * 5, r.right - p * 3, r.bottom - p * 3))
+            return
+        }
         val textArea = if (showStats) PixelFont.height(app.tSmall) * 2 + p * 6 else PixelFont.height(app.tSmall) + p * 4
         val iconBox = RectF(r.left + p * 4, r.top + p * 6, r.right - p * 4, r.bottom - textArea - p)
         def.icon.drawFit(c, iconBox)

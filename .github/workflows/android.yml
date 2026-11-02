@@ -26,6 +26,7 @@ jobs:
 
       - name: Upload screenshots
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
@@ -33,6 +34,7 @@ jobs:
 
       - name: Publish screenshot preview (pre-release "ci-screenshots")
         if: always() && github.event_name == 'push'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -47,6 +49,7 @@ jobs:
 
       - name: Upload test report
         if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: test-report

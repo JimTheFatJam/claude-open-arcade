@@ -59,7 +59,7 @@ class TutorialScreen(app: ArcadeApp, private val def: GameDef, private val onDon
         buttons.clear()
         val maxW = if (wide) p * 330 else p * 210
         val w = minOf(content.width() - p * 8, maxW)
-        val maxH = if (wide) content.height() - p * 10 else minOf(content.height() - p * 10, p * 330)
+        val maxH = if (wide) minOf(content.height() - p * 10, p * 260) else minOf(content.height() - p * 10, neededHeight(w))
         val top = content.top + (content.height() - maxH) / 2
         box.set((app.w - w) / 2, top, (app.w + w) / 2, top + maxH)
         val bh = p * 18
@@ -81,6 +81,18 @@ class TutorialScreen(app: ArcadeApp, private val def: GameDef, private val onDon
             demoPage = page
             demo = pages[page].demo?.invoke()?.also { d -> d.sound = { app.audio.play(it) } }
         }
+    }
+
+    /** Portrait panel height that fits the current page's title, visual, text and buttons. */
+    private fun neededHeight(w: Float): Float {
+        val p = app.p
+        val pg = pages[page]
+        val ts = Gfx.fitSize(pg.title, w - p * 12, app.tBody * 1.5f)
+        val textH = Gfx.paragraphHeight(pg.text, w - p * 14, app.tSmall)
+        val hasDemo = pg.demo != null
+        val visual = if (hasDemo || pg.art != null) minOf(w - p * 14, if (hasDemo) p * 150 else p * 90) + p * 6 else 0f
+        val taskH = if (hasDemo) PixelFont.LINE * app.tSmall * 2 + p * 4 else 0f
+        return p * 20 + PixelFont.height(ts) + visual + taskH + textH + p * 8 + p * 34
     }
 
     private fun next() {

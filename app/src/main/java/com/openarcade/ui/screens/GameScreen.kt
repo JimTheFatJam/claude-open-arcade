@@ -305,7 +305,13 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
             m.c2Left = m.colLeft; m.c2Right = m.colRight
         }
         var y = content.top + p * 5
-        val hh = p * 46
+        // header grows to fit the tagline so long text never spills out of the panel
+        val iconS = p * 36
+        val tw = colW - p * 16 - iconS
+        val ts = Gfx.fitSize(def.title, tw, app.tBody * 2f)
+        val textH = p * 10 + PixelFont.height(ts) + PixelFont.height(app.tSmall) + p * 4 +
+            Gfx.paragraphHeight(def.tagline, tw, app.tSmall) + p * 2
+        val hh = maxOf(p * 46, textH)
         m.header.set(m.colLeft, y, m.colRight, y + hh)
         y += hh + p * 6
         m.statsY = y
@@ -551,7 +557,7 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         c.translate(0f, -menuScroll.offset)
         // header
         Gfx.panel(c, m.header, Pal.BG1, def.accent, p)
-        val iconS = m.header.height() - p * 10
+        val iconS = p * 36
         val ib = RectF(m.header.left + p * 5, m.header.top + p * 5, m.header.left + p * 5 + iconS, m.header.top + p * 5 + iconS)
         Gfx.rect(c, ib, Pal.BG0)
         val bob = sin(t * 2.5f) * p

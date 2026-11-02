@@ -64,9 +64,9 @@ class SplashScreen(app: ArcadeApp) : Screen(app) {
 
     companion object {
         /** The rainbow "OPEN ARCADE" logo with letters dropping in. Shared with the home screen. */
-        fun drawLogo(c: Canvas, app: ArcadeApp, cx: Float, cy: Float, t: Float, maxW: Float = app.w * 0.9f) {
+        fun drawLogo(c: Canvas, app: ArcadeApp, cx: Float, cy: Float, t: Float, maxW: Float = app.w * 0.9f, sizeOverride: Float = 0f) {
             val words = listOf("OPEN", "ARCADE")
-            val size = Gfx.fitSize("ARCADE", maxW, app.p * 4)
+            val size = if (sizeOverride > 0f) sizeOverride else Gfx.fitSize("ARCADE", maxW, app.p * 4)
             val lineH = PixelFont.height(size) + size * 3
             var idx = 0
             words.forEachIndexed { wi, word ->
