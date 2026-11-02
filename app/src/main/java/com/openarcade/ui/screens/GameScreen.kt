@@ -68,6 +68,9 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         var achY = 0f
         var colLeft = 0f
         var colRight = 0f
+        // second column (description, scores, awards); equals the first on narrow screens
+        var c2Left = 0f
+        var c2Right = 0f
     }
 
     private val confetti = ArrayList<FloatArray>() // x, y, vx, vy, color
@@ -246,9 +249,12 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
             actionBox.set(hudBox)
             playArea.set(content.left + side + p * 4, content.top + p * 3, content.right - p * 4, content.bottom - p * 3)
         } else {
-            hudBox.set(content.left + p * 3, content.top + p * 3, content.right - p * 3, content.top + p * 19)
+            // keep HUD and controls a sensible width on tablets instead of stretching edge to edge
+            val barW = minOf(content.width() - p * 6, p * 260)
+            val bl = content.centerX() - barW / 2
+            hudBox.set(bl, content.top + p * 3, bl + barW, content.top + p * 19)
             val ah = if (hasActions) p * 22 else 0f
-            actionBox.set(content.left + p * 3, content.bottom - ah - p * 3, content.right - p * 3, content.bottom - p * 3)
+            actionBox.set(bl, content.bottom - ah - p * 3, bl + barW, content.bottom - p * 3)
             playArea.set(content.left + p * 3, hudBox.bottom + p * 4, content.right - p * 3, (if (hasActions) actionBox.top else content.bottom) - p * 4)
         }
         s?.layout(playArea)
@@ -288,9 +294,16 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         val p = app.p
         menuButtons.clear()
         val m = menuLayout
-        val colW = minOf(content.width() - p * 8, p * 200)
-        m.colLeft = (app.w - colW) / 2
-        m.colRight = m.colLeft + colW
+        val wide = app.wideLayout
+        val colGap = p * 10
+        val colW = if (wide) minOf((content.width() - p * 8 - colGap) / 2, p * 220) else minOf(content.width() - p * 8, p * 210)
+        if (wide) {
+            m.colLeft = app.w / 2 - colGap / 2 - colW; m.colRight = m.colLeft + colW
+            m.c2Left = app.w / 2 + colGap / 2; m.c2Right = m.c2Left + colW
+        } else {
+            m.colLeft = (app.w - colW) / 2; m.colRight = m.colLeft + colW
+            m.c2Left = m.colLeft; m.c2Right = m.colRight
+        }
         var y = content.top + p * 5
         val hh = p * 46
         m.header.set(m.colLeft, y, m.colRight, y + hh)
@@ -330,6 +343,8 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         y += bh + gap
         menuButtons.add(Button("HOW TO PLAY", Icons.HELP, Pal.PURPLE) { openTutorial(null) }).set(m.colLeft, y, m.colRight, y + bh)
         y += bh + p * 8
+        val endA = y
+        if (wide) y = content.top + p * 5 + PixelFont.height(app.tSmall)
         m.descY = y
         y += Gfx.paragraphHeight(def.description, colW - p * 8, app.tSmall) + p * 14
         m.scoresY = y
@@ -337,6 +352,7 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         y += PixelFont.height(app.tBody) + p * 6 + maxOf(1, top.size) * (PixelFont.LINE * app.tSmall + p) + p * 8
         m.achY = y
         y += PixelFont.height(app.tBody) + p * 6 + def.achievements.size * p * 22 + p * 6
+        y = maxOf(y, endA)
         menuContentH = y - content.top
         menuScroll.setContentHeight(menuContentH, content.height())
     }
@@ -573,33 +589,33 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         menuButtons.draw(c)
 
         // description
-        Gfx.text(c, "ABOUT", m.colLeft, m.descY - p * 1, app.tSmall, Pal.CYAN)
-        Gfx.paragraph(c, def.description, m.colLeft + p * 4, m.descY + p * 7, m.colRight - m.colLeft - p * 8, app.tSmall, Pal.LGREY)
+        Gfx.text(c, "ABOUT", m.c2Left, m.descY - p * 1, app.tSmall, Pal.CYAN)
+        Gfx.paragraph(c, def.description, m.c2Left + p * 4, m.descY + p * 7, m.c2Right - m.c2Left - p * 8, app.tSmall, Pal.LGREY)
 
         // top scores
-        Gfx.text(c, if (def.scoreKind == ScoreKind.BEST_TIME) "BEST TIMES" else "HIGH SCORES", m.colLeft, m.scoresY, app.tBody, Pal.CYAN)
+        Gfx.text(c, if (def.scoreKind == ScoreKind.BEST_TIME) "BEST TIMES" else "HIGH SCORES", m.c2Left, m.scoresY, app.tBody, Pal.CYAN)
         var y = m.scoresY + PixelFont.height(app.tBody) + p * 6
         if (st.topScores.isEmpty() || def.scoreKind == ScoreKind.WINS) {
             val txt = if (def.scoreKind == ScoreKind.WINS) "WINS ${st.wins}  -  LOSSES ${st.losses}" else "NO SCORES YET - BE THE FIRST!"
-            Gfx.text(c, txt, m.colLeft + p * 4, y, app.tSmall, Pal.GREY)
+            Gfx.text(c, txt, m.c2Left + p * 4, y, app.tSmall, Pal.GREY)
         } else {
             st.topScores.forEachIndexed { i, v ->
                 val txt = if (def.scoreKind == ScoreKind.BEST_TIME) formatTime(v) else v.toString()
                 val col = when (i) { 0 -> Pal.YELLOW; 1 -> Pal.LGREY; 2 -> Pal.ORANGE; else -> Pal.GREY }
-                Gfx.text(c, "${i + 1}.", m.colLeft + p * 4, y, app.tSmall, col)
-                Gfx.text(c, txt, m.colRight - p * 4, y, app.tSmall, col, Align.RIGHT)
-                Gfx.rect(c, m.colLeft + p * 20, y + PixelFont.height(app.tSmall) - p, m.colRight - p * 4 - PixelFont.width(txt, app.tSmall) - p * 4,
+                Gfx.text(c, "${i + 1}.", m.c2Left + p * 4, y, app.tSmall, col)
+                Gfx.text(c, txt, m.c2Right - p * 4, y, app.tSmall, col, Align.RIGHT)
+                Gfx.rect(c, m.c2Left + p * 20, y + PixelFont.height(app.tSmall) - p, m.c2Right - p * 4 - PixelFont.width(txt, app.tSmall) - p * 4,
                     y + PixelFont.height(app.tSmall), Pal.BG2)
                 y += PixelFont.LINE * app.tSmall + p
             }
         }
 
         // achievements
-        Gfx.text(c, "AWARDS", m.colLeft, m.achY, app.tBody, Pal.CYAN)
+        Gfx.text(c, "AWARDS", m.c2Left, m.achY, app.tBody, Pal.CYAN)
         y = m.achY + PixelFont.height(app.tBody) + p * 6
         for (a in def.achievements) {
             val got = app.storage.isUnlocked(def.achievementId(a.id))
-            val box = RectF(m.colLeft, y, m.colRight, y + p * 19)
+            val box = RectF(m.c2Left, y, m.c2Right, y + p * 19)
             Gfx.rect(c, box, if (got) Pal.withAlpha(Pal.DGREEN, 120) else Pal.withAlpha(Pal.BG1, 200))
             Gfx.frame(c, box, p * 0.5f, if (got) Pal.GREEN else Pal.BG3)
             val ic = if (got) Icons.TROPHY else Icons.LOCK

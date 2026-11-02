@@ -46,6 +46,10 @@ class ArcadeApp(val context: Context, private val invalidate: () -> Unit) {
     var tTitle = 8f; private set
     var barH = 0f; private set
     val landscape get() = w > h
+    /** Screen width measured in art pixels: ~180 on phones, 320+ on tablets. */
+    val widthP get() = w / p
+    /** True when there is room for side-by-side columns (tablets, phones in landscape). */
+    val wideLayout get() = widthP >= 330f && w > h * 1.05f || widthP >= 420f
 
     private val stack = ArrayList<Screen>()
     val top: Screen? get() = stack.lastOrNull()
@@ -81,9 +85,12 @@ class ArcadeApp(val context: Context, private val invalidate: () -> Unit) {
     // ------------------------------------------------------------------ sizing
     fun resize(width: Int, height: Int) {
         w = width.toFloat(); h = height.toFloat()
+        // One art pixel is ~2.4dp, so components keep the same physical size on phones and
+        // tablets; tablets simply get more room. Very small screens shrink to fit 150 pixels.
         val density = context.resources.displayMetrics.density
-        val cap = maxOf(2f, kotlin.math.round(density * 3f))
-        p = floor(minOf(w, h) / 170f).coerceIn(2f, cap)
+        val byDensity = kotlin.math.round(density * 2.4f)
+        val byScreen = floor(minOf(w, h) / 150f)
+        p = minOf(byDensity, byScreen).coerceAtLeast(2f)
         tBody = p
         tSmall = maxOf(2f, floor(p * 0.7f)).let { if (it < 3f && density >= 2f) 3f else it }
         tTitle = p * 2

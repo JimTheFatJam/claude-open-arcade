@@ -20,20 +20,26 @@ import java.util.Calendar
 import kotlin.math.floor
 import kotlin.math.sin
 
-/** Main menu: logo, featured games, continue/recent, favourites and navigation. */
+/**
+ * Main menu: logo, featured games, continue/recent, favourites and navigation. Phones get one
+ * scrolling column; tablets and landscape screens get two columns side by side.
+ */
 class HomeScreen(app: ArcadeApp) : Screen(app) {
     override val title = ""
     override val showBack = false
     private val buttons = ButtonSet(app)
     private val scroller = Scroller(app)
     private var t = 0f
-    private var logoY = 0f
     private val featured: List<GameDef>
     private var featIndex = 0
     private val featBox = RectF()
-    private var sections = ArrayList<Pair<String, Float>>()   // header text, y
-    private var hints = ArrayList<Triple<String, Float, Float>>() // text, y, height
+    private val logoBox = RectF()
+    private class Header(val text: String, val x: Float, val y: Float, val w: Float)
+    private class Hint(val text: String, val box: RectF)
+    private val headers = ArrayList<Header>()
+    private val hints = ArrayList<Hint>()
     private var contentH = 0f
+    private var footerX = 0f
 
     init {
         // three featured games that rotate daily, deterministic per day
@@ -45,26 +51,31 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
     override fun layout() = rebuild()
     override fun resumed() = rebuild()
 
-    private fun cardsPerRow(): Int = floor((app.w - app.p * 8) / (app.p * 50)).toInt().coerceIn(3, 8)
-
     private fun rebuild() {
         val p = app.p
-        buttons.clear(); sections.clear(); hints.clear()
-        val left = p * 4
-        val right = app.w - p * 4
-        val width = right - left
-        var y = content.top + p * 6
-        logoY = y
-        val logoSize = Gfx.fitSize("ARCADE", width * 0.7f, p * 3)
-        y += (PixelFont.height(logoSize) + logoSize * 3) * 2 + p * 4
+        buttons.clear(); headers.clear(); hints.clear()
+        val gap = p * 4
+        val wide = app.wideLayout
+        val maxCol = if (wide) p * 250 else p * 260
+        val total = minOf(app.w - p * 8, if (wide) maxCol * 2 + p * 10 else maxCol)
+        val left = floor((app.w - total) / 2)
+        val colGap = p * 10
+        val colW = if (wide) (total - colGap) / 2 else total
+        val rightX = if (wide) left + colW + colGap else left
 
-        // featured
-        val fh = if (app.landscape) p * 58 else p * 66
-        featBox.set(left, y, right, y + fh)
+        // ---- column A: logo, featured, navigation
+        var y = content.top + p * 6
+        val logoSize = Gfx.fitSize("ARCADE", colW * 0.75f, p * 3)
+        val logoH = (PixelFont.height(logoSize) + logoSize * 3) * 2
+        logoBox.set(left, y, left + colW, y + logoH)
+        y += logoH + p * 4
+
+        val fh = p * 64
+        featBox.set(left, y, left + colW, y + fh)
         val f = featured[featIndex]
-        val bw = p * 44
+        val bw = minOf(p * 44, colW * 0.4f)
         buttons.add(Button("PLAY", Icons.PLAY, Pal.GREEN) { openGame(f) }.also { it.textColor = Pal.BLACK })
-            .set(right - bw - p * 5, featBox.bottom - p * 22, right - p * 5, featBox.bottom - p * 6)
+            .set(featBox.right - bw - p * 5, featBox.bottom - p * 22, featBox.right - p * 5, featBox.bottom - p * 6)
         if (featured.size > 1) {
             val ab = p * 14
             buttons.add(Button("", Icons.BACK, Pal.BG3) { featIndex = (featIndex + featured.size - 1) % featured.size; rebuild() })
@@ -74,10 +85,8 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
         }
         y = featBox.bottom + p * 8
 
-        // navigation
-        val gap = p * 4
-        val navCols = if (app.landscape) 4 else 2
-        val nbw = (width - gap * (navCols - 1)) / navCols
+        val navCols = 2
+        val nbw = (colW - gap * (navCols - 1)) / navCols
         val nbh = p * 20
         val nav = listOf(
             Triple("LIBRARY", Icons.LIBRARY, Pal.BLUE) to { app.push(LibraryScreen(app)) },
@@ -86,38 +95,41 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
             Triple("SETTINGS", Icons.GEAR, Pal.DGREY) to { app.push(SettingsScreen(app)) },
         )
         nav.forEachIndexed { i, (info, fn) ->
-            val col = i % navCols
-            val row = i / navCols
-            val x = left + col * (nbw + gap)
-            val yy = y + row * (nbh + gap)
+            val x = left + (i % navCols) * (nbw + gap)
+            val yy = y + (i / navCols) * (nbh + gap)
             buttons.add(Button(info.first, info.second, info.third) { fn() }).set(x, yy, x + nbw, yy + nbh)
         }
         y += ((nav.size + navCols - 1) / navCols) * (nbh + gap) + p * 6
+        val endA = y
 
-        // recent + favourites rows
-        val cols = cardsPerRow()
-        val cw = (width - gap * (cols - 1)) / cols
+        // ---- column B (or continued column on phones): recent + favourites
+        if (wide) y = content.top + p * 6
+        val cols = floor((colW + gap) / (p * 50 + gap)).toInt().coerceIn(3, 6)
+        val cw = (colW - gap * (cols - 1)) / cols
         val ch = cw * 1.2f
-        fun row(header: String, ids: List<String>, empty: String) {
-            sections.add(header to y)
+        fun row(header: String, ids: List<String>, empty: String, maxRows: Int) {
+            headers.add(Header(header, rightX, y, colW))
             y += PixelFont.height(app.tBody) + p * 5
-            val defs = ids.mapNotNull { GameRegistry.byId(it) }.take(cols)
+            val defs = ids.mapNotNull { GameRegistry.byId(it) }.take(cols * maxRows)
             if (defs.isEmpty()) {
-                val hh = Gfx.paragraphHeight(empty, width - p * 8, app.tSmall) + p * 8
-                hints.add(Triple(empty, y, hh))
+                val hh = Gfx.paragraphHeight(empty, colW - p * 8, app.tSmall) + p * 8
+                hints.add(Hint(empty, RectF(rightX, y, rightX + colW, y + hh)))
                 y += hh + p * 6
             } else {
                 defs.forEachIndexed { i, d ->
-                    val x = left + i * (cw + gap)
-                    buttons.add(GameCard(d) { openGame(d) }).set(x, y, x + cw, y + ch)
+                    val x = rightX + (i % cols) * (cw + gap)
+                    val yy = y + (i / cols) * (ch + gap)
+                    buttons.add(GameCard(d) { openGame(d) }).set(x, yy, x + cw, yy + ch)
                 }
-                y += ch + p * 8
+                y += ((defs.size + cols - 1) / cols) * (ch + gap) + p * 4
             }
         }
-        row("CONTINUE PLAYING", app.storage.recents(), "Games you play will show up here. Open the library to pick your first game!")
-        row("FAVORITES", app.storage.favorites(), "Tap the star on a game's menu to add it to your favorites.")
-        y += p * 4
-        contentH = y - content.top
+        val rows = if (wide) 2 else 1
+        row("CONTINUE PLAYING", app.storage.recents(), "Games you play will show up here. Open the library to pick your first game!", rows)
+        row("FAVORITES", app.storage.favorites(), "Tap the star on a game's menu to add it to your favorites.", rows)
+        y = maxOf(y, endA) + p * 4
+        footerX = left + total / 2
+        contentH = y + p * 10 - content.top
         scroller.setContentHeight(contentH, content.height())
     }
 
@@ -133,17 +145,17 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
         c.save()
         c.clipRect(content)
         c.translate(0f, -scroller.offset)
-        val logoW = (app.w - p * 8) * 0.7f
+        val logoW = logoBox.width() * 0.75f
         val logoSize = Gfx.fitSize("ARCADE", logoW, p * 3)
         val lineH = PixelFont.height(logoSize) + logoSize * 3
-        SplashScreen.drawLogo(c, app, app.w / 2, logoY + lineH, 10f + t, logoW)
+        SplashScreen.drawLogo(c, app, logoBox.centerX(), logoBox.top + lineH, 10f + t, logoW)
 
         // featured panel
         val f = featured[featIndex]
         Gfx.panel(c, featBox, Pal.BG1, f.accent, p)
         val pulse = (sin(t * 3f) + 1f) / 2f
-        Gfx.text(c, "${com.openarcade.gfx.PixelFont.STAR} FEATURED TODAY", featBox.left + p * 6, featBox.top + p * 6, app.tSmall, Pal.mix(Pal.YELLOW, Pal.ORANGE, pulse))
-        val iconS = featBox.height() - p * 40
+        Gfx.text(c, "${PixelFont.STAR} FEATURED TODAY", featBox.left + p * 6, featBox.top + p * 6, app.tSmall, Pal.mix(Pal.YELLOW, Pal.ORANGE, pulse))
+        val iconS = minOf(featBox.height() - p * 40, featBox.width() * 0.35f)
         val iconBox = RectF(featBox.left + p * 6, featBox.top + p * 14, featBox.left + p * 6 + iconS, featBox.top + p * 14 + iconS)
         Gfx.rect(c, iconBox.left - p, iconBox.top - p, iconBox.right + p, iconBox.bottom + p, Pal.BG0)
         f.icon.drawFit(c, iconBox)
@@ -154,19 +166,18 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
         Gfx.text(c, f.category.label, tx, featBox.top + p * 17 + PixelFont.height(ts), app.tSmall, f.accent)
         Gfx.paragraph(c, f.tagline, tx, featBox.top + p * 21 + PixelFont.height(ts) + PixelFont.height(app.tSmall), tw, app.tSmall, Pal.LGREY)
 
-        for ((text, y) in sections) {
-            Gfx.text(c, text, p * 4, y, app.tBody, Pal.CYAN)
-            Gfx.rect(c, p * 4, y + PixelFont.height(app.tBody) + p * 2, app.w - p * 4, y + PixelFont.height(app.tBody) + p * 3, Pal.BG2)
+        for (h in headers) {
+            Gfx.text(c, h.text, h.x, h.y, app.tBody, Pal.CYAN)
+            Gfx.rect(c, h.x, h.y + PixelFont.height(app.tBody) + p * 2, h.x + h.w, h.y + PixelFont.height(app.tBody) + p * 3, Pal.BG2)
         }
-        for ((text, y, hh) in hints) {
-            val box = RectF(p * 4, y, app.w - p * 4, y + hh)
-            Gfx.rect(c, box, Pal.withAlpha(Pal.BG1, 200))
-            Gfx.frame(c, box, p * 0.5f, Pal.BG3)
-            Gfx.paragraph(c, text, box.left + p * 4, box.top + p * 4, box.width() - p * 8, app.tSmall, Pal.GREY)
+        for (h in hints) {
+            Gfx.rect(c, h.box, Pal.withAlpha(Pal.BG1, 200))
+            Gfx.frame(c, h.box, p * 0.5f, Pal.BG3)
+            Gfx.paragraph(c, h.text, h.box.left + p * 4, h.box.top + p * 4, h.box.width() - p * 8, app.tSmall, Pal.GREY)
         }
         buttons.draw(c)
-        Gfx.text(c, "V1.0  ${GameRegistry.all.size} GAMES  ${com.openarcade.gfx.PixelFont.HEART} MORE COMING SOON",
-            app.w / 2, content.top + contentH - p * 6, app.tSmall * 0.8f, Pal.DGREY, Align.CENTER, null)
+        Gfx.text(c, "V${com.openarcade.BuildInfo.VERSION}  ${GameRegistry.all.size} GAMES  ${PixelFont.HEART} MORE COMING SOON",
+            footerX, content.top + contentH - p * 8, app.tSmall * 0.8f, Pal.DGREY, Align.CENTER, null)
         c.restore()
         scroller.drawBar(c, content)
     }

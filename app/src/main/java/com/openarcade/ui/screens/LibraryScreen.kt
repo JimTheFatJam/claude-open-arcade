@@ -39,6 +39,7 @@ class LibraryScreen(app: ArcadeApp) : Screen(app) {
     private val keyboardBox = RectF()
     private var results: List<GameDef> = emptyList()
     private var gridH = 0f
+    private var gridLeft = 0f
 
     override fun layout() = rebuild()
     override fun resumed() = rebuild()
@@ -46,8 +47,13 @@ class LibraryScreen(app: ArcadeApp) : Screen(app) {
     private fun rebuild() {
         val p = app.p
         header.clear(); grid.clear(); keys.clear()
-        val left = p * 4
-        val right = app.w - p * 4
+        // header (search + chips) stays a comfortable width; the card grid may use more room
+        val headW = minOf(app.w - p * 8, p * 380)
+        val left = floor((app.w - headW) / 2)
+        val right = left + headW
+        val gridW = minOf(app.w - p * 8, p * 600)
+        val gLeft = floor((app.w - gridW) / 2)
+        val gRight = gLeft + gridW
         var y = content.top + p * 4
 
         // search field
@@ -93,15 +99,15 @@ class LibraryScreen(app: ArcadeApp) : Screen(app) {
             okFilter && (q.isEmpty() || d.title.lowercase().contains(q) || d.tagline.lowercase().contains(q) ||
                 d.category.label.lowercase().contains(q))
         }
-        val cols = floor((right - left) / (p * 48)).toInt().coerceIn(3, 8)
+        val cols = floor((gRight - gLeft) / (p * 50)).toInt().coerceIn(3, 10)
         val ggap = p * 4
-        val cardW = (right - left - ggap * (cols - 1)) / cols
+        val cardW = (gRight - gLeft - ggap * (cols - 1)) / cols
         val cardH = cardW * 1.22f
         var gy = gridView.top + p * 12
         results.forEachIndexed { i, d ->
             val col = i % cols
             val row = i / cols
-            val x = left + col * (cardW + ggap)
+            val x = gLeft + col * (cardW + ggap)
             val yy = gy + row * (cardH + ggap)
             grid.add(GameCard(d) { app.push(GameScreen(app, d)) }).set(x, yy, x + cardW, yy + cardH)
         }
@@ -109,6 +115,7 @@ class LibraryScreen(app: ArcadeApp) : Screen(app) {
         gy += rows * (cardH + ggap) + p * 20
         gridH = gy - gridView.top
         scroller.setContentHeight(gridH, gridView.height())
+        gridLeft = gLeft
 
         if (keyboardOpen) buildKeyboard()
     }
@@ -166,7 +173,7 @@ class LibraryScreen(app: ArcadeApp) : Screen(app) {
             results.isEmpty() -> ""
             else -> "${results.size} GAME" + (if (results.size == 1) "" else "S")
         }
-        Gfx.text(c, countText, p * 4, gridView.top + p * 3, app.tSmall, Pal.GREY)
+        Gfx.text(c, countText, gridLeft, gridView.top + p * 3, app.tSmall, Pal.GREY)
         grid.draw(c)
         if (results.isEmpty()) {
             val msg = if (filter == "FAV" && query.isEmpty()) "No favorites yet. Open a game and tap its star to add it here."

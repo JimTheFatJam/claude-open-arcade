@@ -153,7 +153,7 @@ class SettingsScreen(app: ArcadeApp) : Screen(app) {
     }
 
     companion object {
-        const val ABOUT = "OPEN ARCADE V1.0\nA pocket retro console of original-style classic games.\n" +
+        val ABOUT = "OPEN ARCADE V${com.openarcade.BuildInfo.VERSION}\nA pocket retro console of original-style classic games.\n" +
             "No ads, no accounts, no internet. All music and sound is synthesised on your device. " +
             "All progress is stored only on this device."
     }

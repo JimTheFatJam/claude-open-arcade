@@ -25,6 +25,7 @@ class StatsScreen(app: ArcadeApp) : Screen(app) {
     private var contentH = 0f
     private var left = 0f
     private var right = 0f
+    private var rowW = 0f
 
     override fun layout() = rebuild()
     override fun resumed() = rebuild()
@@ -32,7 +33,8 @@ class StatsScreen(app: ArcadeApp) : Screen(app) {
     private fun rebuild() {
         val p = app.p
         rows.clear()
-        val colW = minOf(content.width() - p * 8, p * 220)
+        val wide = app.wideLayout
+        val colW = minOf(content.width() - p * 8, if (wide) p * 470 else p * 220)
         left = (app.w - colW) / 2
         right = left + colW
         var y = content.top + p * 6
@@ -41,10 +43,16 @@ class StatsScreen(app: ArcadeApp) : Screen(app) {
         listY = y
         y += PixelFont.height(app.tBody) + p * 6
         val rh = p * 24
-        for (d in GameRegistry.all) {
-            rows.add(GameCard(d, showStats = false) { app.push(GameScreen(app, d)) }).set(left, y, left + rh, y + rh)
-            y += rh + p * 3
+        // per-game rows: two columns on wide screens
+        val cols = if (wide) 2 else 1
+        val gap = p * 8
+        rowW = (colW - gap * (cols - 1)) / cols
+        GameRegistry.all.forEachIndexed { i, d ->
+            val x = left + (i % cols) * (rowW + gap)
+            val yy = y + (i / cols) * (rh + p * 3)
+            rows.add(GameCard(d, showStats = false) { app.push(GameScreen(app, d)) }).set(x, yy, x + rh, yy + rh)
         }
+        y += ((GameRegistry.all.size + cols - 1) / cols) * (rh + p * 3)
         contentH = y + p * 6 - content.top
         scroller.setContentHeight(contentH, content.height())
     }
@@ -87,6 +95,7 @@ class StatsScreen(app: ArcadeApp) : Screen(app) {
             val s = app.storage.stats(card.def.id)
             val x = b.rect.right + p * 5
             val r = b.rect
+            val right = r.left + rowW
             Gfx.rect(c, RectF(r.right + p * 2, r.top, right, r.bottom), Pal.withAlpha(Pal.BG1, 180))
             Gfx.text(c, card.def.title, x, r.top + p * 4, app.tSmall, Pal.WHITE)
             val line = "PLAYED ${s.played}  WINS ${s.wins}"
