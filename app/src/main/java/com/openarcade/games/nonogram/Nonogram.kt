@@ -148,6 +148,7 @@ class NonogramSession(host: GameHost) : GameSession(host) {
         .put("pic", JSONArray(pic.rows)).put("marks", marks.toJsonArray()).put("hints", hints)
 
     override fun onLayout() {
+        if (!::rowClues.isInitialized) return  // laid out again once the puzzle is loaded
         val p = px
         val k = maxOf(rowClues.maxOf { maxOf(1, it.size) }, colClues.maxOf { maxOf(1, it.size) })
         val ratio = 0.62f
