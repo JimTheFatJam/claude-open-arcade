@@ -24,7 +24,38 @@ enum class Difficulty(val label: String) { EASY("EASY"), NORMAL("NORMAL"), HARD(
 /** How a game's "best" is measured, used by the stats & high score displays. */
 enum class ScoreKind { HIGH_SCORE, BEST_TIME, WINS }
 
-class TutorialPage(val title: String, val text: String, val art: PixelArt? = null)
+/**
+ * A tutorial page. Besides a static [art] illustration, a page can host an interactive [demo]: a
+ * tiny playable board where the player tries the mechanic being explained.
+ */
+class TutorialPage(
+    val title: String,
+    val text: String,
+    val art: PixelArt? = null,
+    val demo: (() -> TutorialDemo)? = null,
+)
+
+/** An interactive tutorial exercise drawn inside the tutorial page. */
+abstract class TutorialDemo {
+    /** The instruction shown under the demo ("TRY IT: ..."). */
+    abstract val task: String
+    /** Short feedback after the player's last action; replaces [task] while non-empty. */
+    var feedback: String = ""
+    var feedbackGood = true
+    /** Set once the player has completed the exercise. */
+    var done = false
+    /** Sound hook supplied by the tutorial screen. */
+    var sound: (Sfx) -> Unit = {}
+
+    open fun update(dt: Float) {}
+    abstract fun draw(c: Canvas, box: RectF, p: Float, t: Float)
+    /** Touch inside the demo's [box]. */
+    abstract fun onTouch(e: MotionEvent, box: RectF)
+
+    protected fun good(msg: String, s: Sfx = Sfx.SELECT) { feedback = msg; feedbackGood = true; sound(s) }
+    protected fun bad(msg: String) { feedback = msg; feedbackGood = false; sound(Sfx.ERROR) }
+    protected fun complete(msg: String) { feedback = msg; feedbackGood = true; if (!done) { done = true; sound(Sfx.COIN) } }
+}
 
 class AchievementDef(val id: String, val title: String, val desc: String)
 

@@ -31,27 +31,20 @@ import org.json.JSONObject
 import kotlin.math.floor
 import kotlin.math.sin
 
-/** Configuration distinguishing classic Sudoku from cat-themed Meowdoku. */
-class SudokuStyle(val meow: Boolean) {
-    fun dims(d: Difficulty): Triple<Int, Int, Int> = if (meow) when (d) {
-        Difficulty.EASY -> Triple(4, 2, 2)
-        Difficulty.NORMAL -> Triple(6, 2, 3)
-        Difficulty.HARD -> Triple(9, 3, 3)
-    } else Triple(9, 3, 3)
+/** Classic 9x9 Sudoku. Clue counts per difficulty. */
+object SudokuStyle {
+    fun dims(): Triple<Int, Int, Int> = Triple(9, 3, 3)
 
-    fun clues(d: Difficulty): Int = if (meow) when (d) {
-        Difficulty.EASY -> 6
-        Difficulty.NORMAL -> 14
-        Difficulty.HARD -> 32
-    } else when (d) {
+    fun clues(d: Difficulty): Int = when (d) {
         Difficulty.EASY -> 38
         Difficulty.NORMAL -> 30
         Difficulty.HARD -> 24
     }
 }
 
-class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSession(host) {
-    private val dims = style.dims(host.difficulty)
+class SudokuSession(host: GameHost) : GameSession(host) {
+    private val style = SudokuStyle
+    private val dims = style.dims()
     private val n = dims.first
     private val core = SudokuCore(n, dims.second, dims.third)
     private var given = IntArray(n * n)
@@ -170,7 +163,7 @@ class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSessio
         }
         // correct: clear this value from peer notes
         for (pe in core.peersOf(i)) notes[pe] = notes[pe] and (1 shl (v - 1)).inv()
-        host.sfx(if (style.meow) Sfx.MEOW else Sfx.PLACE)
+        host.sfx(Sfx.PLACE)
         checkUnits(i)
         if (cells.contentEquals(solution)) {
             host.unlock("first_win")
@@ -263,11 +256,11 @@ class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSessio
         val p = px
         if (!ready) {
             val dots = ".".repeat(1 + (t * 3).toInt() % 3)
-            Gfx.text(c, if (style.meow) "HERDING CATS$dots" else "GENERATING$dots", area.centerX(), area.centerY(), host.px, Pal.YELLOW, Align.CENTER)
+            Gfx.text(c, "GENERATING$dots", area.centerX(), area.centerY(), host.px, Pal.YELLOW, Align.CENTER)
             return
         }
         val boardR = RectF(ox, oy, ox + cell * n, oy + cell * n)
-        val accent = if (style.meow) Pal.PINK else Pal.CYAN
+        val accent = Pal.CYAN
         drawBoardFrame(c, boardR, p, accent)
         val sel = selected
         val selVal = if (sel >= 0) cells[sel] else 0
@@ -276,7 +269,7 @@ class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSessio
             val cx = i % n; val cy = i / n
             r.set(ox + cx * cell, oy + cy * cell, ox + (cx + 1) * cell, oy + (cy + 1) * cell)
             val boxShade = core.box(i) % 2 == 0
-            var bg = if (style.meow) (if (boxShade) 0xFF3A2440.toInt() else 0xFF2C1C34.toInt()) else (if (boxShade) Pal.BG1 else Pal.BG0)
+            var bg = if (boxShade) Pal.BG1 else Pal.BG0
             if (sel >= 0) {
                 if (i == sel) bg = Pal.mix(accent, Pal.BG1, 0.45f)
                 else if (cx == sel % n || cy == sel / n || core.box(i) == core.box(sel)) bg = Pal.mix(bg, accent, 0.18f)
@@ -287,17 +280,9 @@ class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSessio
             val v = cells[i]
             if (v != 0) {
                 val wrong = v != solution[i]
-                if (style.meow) {
-                    val bob = if (given[i] == 0 && !wrong) sin(t * 3f + i) * cell * 0.03f else 0f
-                    val inset = cell * 0.1f
-                    CATS[v - 1].draw(c, RectF(r.left + inset, r.top + inset + bob, r.right - inset, r.bottom - inset + bob))
-                    if (wrong) Gfx.frame(c, RectF(r.left + p, r.top + p, r.right - p, r.bottom - p), p, Pal.RED)
-                    if (given[i] != 0) Gfx.rect(c, r.right - p * 3, r.bottom - p * 3, r.right - p, r.bottom - p, Pal.WHITE)
-                } else {
-                    val size = (cell * 0.6f / PixelFont.GLYPH_H)
-                    val col = when { given[i] != 0 -> Pal.WHITE; wrong -> Pal.RED; else -> Pal.CYAN }
-                    Gfx.textMid(c, v.toString(), r.centerX(), r.centerY(), size, col)
-                }
+                val size = (cell * 0.6f / PixelFont.GLYPH_H)
+                val col = when { given[i] != 0 -> Pal.WHITE; wrong -> Pal.RED; else -> Pal.CYAN }
+                Gfx.textMid(c, v.toString(), r.centerX(), r.centerY(), size, col)
             } else if (notes[i] != 0) {
                 val sub = if (n == 4) 2 else 3
                 val sc = cell / sub
@@ -305,13 +290,8 @@ class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSessio
                     if (notes[i] and (1 shl k) == 0) continue
                     val nx = r.left + (k % sub) * sc
                     val ny = r.top + (k / sub) * sc
-                    if (style.meow) {
-                        val d = sc * 0.2f
-                        CATS[k].draw(c, RectF(nx + d, ny + d, nx + sc - d, ny + sc - d), 200)
-                    } else {
-                        val s = maxOf(1f, sc * 0.55f / PixelFont.GLYPH_H)
-                        Gfx.textMid(c, (k + 1).toString(), nx + sc / 2, ny + sc / 2, s, Pal.GREY, shadow = null)
-                    }
+                    val s = maxOf(1f, sc * 0.55f / PixelFont.GLYPH_H)
+                    Gfx.textMid(c, (k + 1).toString(), nx + sc / 2, ny + sc / 2, s, Pal.GREY, shadow = null)
                 }
             }
         }
@@ -331,13 +311,8 @@ class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSessio
             val remaining = n - cells.indices.count { cells[it] == v && solution[it] == v }
             val done = remaining == 0
             Gfx.bevel(c, pr, if (done) Pal.BG1 else if (notesMode) Pal.DGREY else Pal.BG3, maxOf(1f, p / 2))
-            if (style.meow) {
-                val inset = pr.width() * 0.12f
-                CATS[k].draw(c, RectF(pr.left + inset, pr.top + inset, pr.right - inset, pr.bottom - inset), if (done) 70 else 255)
-            } else {
-                val s = pr.height() * 0.5f / PixelFont.GLYPH_H
-                Gfx.textMid(c, v.toString(), pr.centerX(), pr.centerY(), s, if (done) Pal.DGREY else if (notesMode) Pal.LGREY else Pal.WHITE)
-            }
+            val s = pr.height() * 0.5f / PixelFont.GLYPH_H
+            Gfx.textMid(c, v.toString(), pr.centerX(), pr.centerY(), s, if (done) Pal.DGREY else if (notesMode) Pal.LGREY else Pal.WHITE)
             if (!done && remaining < n) {
                 val s = maxOf(1f, pr.height() * 0.16f / PixelFont.GLYPH_H)
                 Gfx.text(c, remaining.toString(), pr.right - p, pr.top + p, s, Pal.YELLOW, Align.RIGHT, null)
@@ -345,40 +320,6 @@ class SudokuSession(host: GameHost, private val style: SudokuStyle) : GameSessio
         }
     }
 
-    companion object {
-        private val CAT_TEMPLATE = listOf(
-            "KK.......KK",
-            "KpK.....KpK",
-            "KooKKKKKooK",
-            "KoosososooK",
-            "KoooooooooK",
-            "KoEEoooEEoK",
-            "KoEKoooEKoK",
-            "KooooNooooK",
-            "KoooKoKoooK",
-            ".KoooooooK.",
-            "..KKKKKKK..",
-        )
-
-        private fun cat(fur: Int, stripe: Int, eye: Int, outline: Int = Pal.BLACK) = PixelArt(
-            CAT_TEMPLATE,
-            mapOf('K' to outline, 'p' to Pal.PINK, 'o' to fur, 's' to stripe, 'E' to eye, 'N' to Pal.PINK),
-        )
-
-        /** Nine cats for Meowdoku: each plays the role of one digit. */
-        val CATS = listOf(
-            cat(Pal.ORANGE, Pal.darker(Pal.ORANGE, 0.35f), Pal.GREEN),        // 1 ginger
-            cat(Pal.WHITE, Pal.LGREY, Pal.CYAN),                               // 2 snow
-            cat(0xFF34344E.toInt(), 0xFF34344E.toInt(), Pal.YELLOW, Pal.BLACK),// 3 shadow
-            cat(Pal.GREY, Pal.DGREY, Pal.ORANGE),                              // 4 smoky
-            cat(Pal.WHITE, Pal.ORANGE, Pal.GREEN),                             // 5 calico
-            cat(Pal.PEACH, Pal.DBROWN, Pal.BLUE),                              // 6 siamese
-            cat(0xFF26263A.toInt(), Pal.WHITE, Pal.GREEN),                     // 7 tuxedo
-            cat(Pal.BROWN, Pal.DBROWN, Pal.YELLOW),                            // 8 cocoa
-            cat(Pal.PURPLE, Pal.PINK, Pal.YELLOW),                             // 9 cosmic
-        )
-        val CAT_NAMES = listOf("GINGER", "SNOW", "SHADOW", "SMOKY", "CALICO", "SIAMESE", "TUXEDO", "COCOA", "COSMO")
-    }
 }
 
 val SudokuGame = GameDef(
@@ -430,59 +371,5 @@ val SudokuGame = GameDef(
         AchievementDef("hard_win", "GRAND SOLVER", "Solve a HARD Sudoku."),
         AchievementDef("purist", "PURIST", "Solve without hints or mistakes."),
     ),
-    factory = { SudokuSession(it, SudokuStyle(meow = false)) },
-)
-
-val MeowdokuGame = GameDef(
-    id = "meowdoku",
-    title = "MEOWDOKU",
-    category = Category.PUZZLE,
-    tagline = "Sudoku with cats! Every row, column and box needs one of each kitty.",
-    description = "A purr-fectly cute Sudoku. Instead of numbers you place pixel cats: Ginger, Snow, Shadow and friends. " +
-        "Start with a tiny 4x4 kitten puzzle and work your way up to the full 9-cat challenge.",
-    icon = PixelArt(
-        "................",
-        "..KK.......KK...",
-        "..KpK.....KpK...",
-        "..KOOKKKKKOOK...",
-        "..KOOrOrOrOOK...".replace('r', 'O'),
-        "..KOOOOOOOOOK...",
-        "..KOGGOOOGGOK...",
-        "..KOGKOOOGKOK...",
-        "..KOOOOpOOOOK...",
-        "..KOOOKOKOOOK...",
-        "...KOOOOOOOK....",
-        "....KKKKKKK.....",
-        "..............pp",
-        "............pppp",
-        ".............pp.",
-        "................",
-    ),
-    accent = Pal.PINK,
-    music = Music.CAT,
-    scoreKind = ScoreKind.BEST_TIME,
-    difficultyLabels = listOf("KITTEN 4X4", "CAT 6X6", "LION 9X9"),
-    tutorial = listOf(
-        TutorialPage("OBJECTIVE", "It's Sudoku with cats! Fill the grid so that every ROW, COLUMN and BOX contains each kind of cat exactly once.",
-            PixelArt(
-                "..........",
-                ".KK....KK.",
-                ".KOKKKKOK.",
-                ".KOOOOOOK.",
-                ".KOGOOGOK.",
-                ".KOOpOOOK.",
-                "..KOOOOK..",
-                "...KKKK...",
-            )),
-        TutorialPage("MEET THE CATS", "KITTEN puzzles use 4 cats in a 4x4 grid. CAT puzzles use 6 cats with 2x3 boxes. LION puzzles use all 9 cats - a full Sudoku!", Icons.HELP),
-        TutorialPage("CONTROLS", "TAP a square, then tap a cat on the pad below to place it. Each cat says meow when it's in the right spot! Use NOTES to pencil in tiny cats.", Icons.TAP),
-        TutorialPage("RULES", "A cat outlined in red is in the wrong place. Starting cats have a small white mark and can't be moved. HINT places a correct cat for you.", Icons.HINT),
-        TutorialPage("TIPS", "Think of each cat as a number. Find a box that is missing only one cat - that's an easy win. The small yellow number on each pad button shows how many of that cat are still missing.", Icons.BULB),
-    ),
-    achievements = listOf(
-        AchievementDef("first_win", "CAT HERDER", "Solve a Meowdoku."),
-        AchievementDef("hard_win", "PRIDE OF LIONS", "Solve a LION 9x9 Meowdoku."),
-        AchievementDef("purist", "PURR-FECT", "Solve without hints or mistakes."),
-    ),
-    factory = { SudokuSession(it, SudokuStyle(meow = true)) },
+    factory = { SudokuSession(it) },
 )

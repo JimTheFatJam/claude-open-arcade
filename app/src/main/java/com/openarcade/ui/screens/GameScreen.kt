@@ -156,6 +156,11 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         startRound(continueSave)
     }
 
+    /** Starts a fresh round immediately, skipping the menu (used by automated UI tests). */
+    internal fun startRoundForTest() = startRound(false)
+
+    internal val sessionForTest: GameSession? get() = session
+
     private fun startRound(continueSave: Boolean) {
         val saved = if (continueSave) app.storage.savedGame(def.id) else null
         if (!continueSave) app.storage.putSave(def.id, null)

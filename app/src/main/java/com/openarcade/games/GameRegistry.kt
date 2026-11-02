@@ -10,7 +10,7 @@ object GameRegistry {
             com.openarcade.games.minesweeper.MinesweeperGame,
             com.openarcade.games.g2048.Game2048,
             com.openarcade.games.sudoku.SudokuGame,
-            com.openarcade.games.sudoku.MeowdokuGame,
+            com.openarcade.games.meowdoku.MeowdokuGame,
             com.openarcade.games.nonogram.NonogramGame,
             com.openarcade.games.flow.FlowLinkGame,
             com.openarcade.games.unblock.UnblockGame,

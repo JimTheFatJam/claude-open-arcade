@@ -124,25 +124,57 @@ class RenderFuzzTest {
 
     @Test fun consoleScreens() {
         val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
-        for ((w, h) in listOf(1080 to 2280, 2280 to 1080, 720 to 1280)) {
-            val tag = "${w}x$h"
+        // phones and tablets, portrait and landscape, at realistic densities
+        val devices = listOf(
+            Triple("phone-port", 1080 to 2340, "420dpi"),
+            Triple("phone-land", 2340 to 1080, "420dpi"),
+            Triple("small-port", 720 to 1280, "xhdpi"),
+            Triple("tablet-port", 1600 to 2560, "xhdpi"),
+            Triple("tablet-land", 2560 to 1600, "xhdpi"),
+            Triple("tablet7-land", 1920 to 1200, "tvdpi"),
+        )
+        for ((tag, size, dpi) in devices) {
+            val (w, h) = size
+            org.robolectric.RuntimeEnvironment.setQualifiers("+$dpi")
             val app = ArcadeApp(ctx) {}
+            app.storage.resetTutorials()
             app.resize(w, h)
             val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             val c = Canvas(bmp)
-            fun shot(name: String) { repeat(3) { app.frame(c) }; Thread.sleep(20); app.frame(c); save(bmp, "screen-$tag-$name") }
-            app.replaceAll(com.openarcade.ui.screens.SplashScreen(app), animate = false); shot("splash")
+            fun shot(name: String, frames: Int = 3) { repeat(frames) { app.frame(c) }; Thread.sleep(20); app.frame(c); save(bmp, "screen-$tag-$name") }
+            app.replaceAll(com.openarcade.ui.screens.SplashScreen(app), animate = false); shot("splash", 30)
             app.replaceAll(com.openarcade.ui.screens.HomeScreen(app), animate = false); shot("home")
-            app.push(com.openarcade.ui.screens.LibraryScreen(app), animate = false); shot("library")
-            app.pop(false)
+            app.push(com.openarcade.ui.screens.LibraryScreen(app), animate = false); shot("library"); app.pop(false)
             app.push(com.openarcade.ui.screens.SettingsScreen(app), animate = false); shot("settings"); app.pop(false)
             app.push(com.openarcade.ui.screens.StatsScreen(app), animate = false); shot("stats"); app.pop(false)
             app.push(com.openarcade.ui.screens.AchievementsScreen(app), animate = false); shot("awards"); app.pop(false)
-            for (id in listOf("meowdoku", "chess", "tetromino")) {
+            for (id in listOf("meowdoku", "sudoku", "chess", "tetromino", "minesweeper", "2048", "flowlink", "mazemuncher", "nonogram")) {
                 val gs = com.openarcade.ui.screens.GameScreen(app, GameRegistry.byId(id)!!)
-                app.push(gs, animate = false); shot("menu-$id")
-                app.pushOverlay(com.openarcade.ui.screens.TutorialScreen(app, gs.def) {}); shot("tutorial-$id")
-                app.handleBack(); app.pop(false)
+                app.push(gs, animate = false); shot("$id-menu")
+                if (id == "meowdoku") {
+                    for (k in gs.def.tutorial.indices) {
+                        val ts = com.openarcade.ui.screens.TutorialScreen(app, gs.def) {}
+                        app.pushOverlay(ts)
+                        repeat(k) { ts.javaClass.getDeclaredMethod("next").apply { isAccessible = true }.invoke(ts) }
+                        shot("meowdoku-tutorial-$k", 60)
+                        app.popOverlay(ts)
+                    }
+                }
+                app.storage.setTutorialSeen(id)
+                gs.startRoundForTest()
+                repeat(40) { app.frame(c); Thread.sleep(10) }
+                if (id == "meowdoku") {
+                    // play a little: mark some cells, then ask for a hint
+                    val s = gs.sessionForTest!!
+                    val a = s.area
+                    for (k in 0 until 6) {
+                        val x = a.left + a.width() * (0.2f + 0.12f * k); val y = a.top + a.height() * 0.3f
+                        s.onTouch(ev(MotionEvent.ACTION_DOWN, x, y)); s.onTouch(ev(MotionEvent.ACTION_UP, x, y))
+                    }
+                    s.actions().first { it.label == "HINT" }.onClick()
+                }
+                shot("$id-play", 10)
+                app.pop(false)
             }
             app.destroy()
         }
