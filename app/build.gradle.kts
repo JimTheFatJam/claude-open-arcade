@@ -35,6 +35,11 @@ android {
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.maxHeapSize = "3g"
+            it.systemProperty("screens.dir", layout.buildDirectory.dir("screens").get().asFile.absolutePath)
+        }
     }
 }
 
@@ -42,4 +47,6 @@ dependencies {
     // Intentionally no runtime dependencies: the whole arcade (graphics, font, music, games)
     // is built on the Android framework so it works fully offline with a tiny APK.
     testImplementation("junit:junit:4.13.2")
+    // Robolectric renders every screen and fuzzes every game headlessly (see RenderFuzzTest).
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
