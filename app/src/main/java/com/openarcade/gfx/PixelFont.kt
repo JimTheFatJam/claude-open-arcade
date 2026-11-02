@@ -138,7 +138,8 @@ object PixelFont {
     /** Draws [text] with its top-left at (x, y). */
     fun draw(c: Canvas, text: String, x: Float, y: Float, size: Float, color: Int) {
         val bmp = atlas()
-        paint.colorFilter = filter(color)
+        // opaque filter colour; transparency comes from the paint alpha so it isn't applied twice
+        paint.colorFilter = filter(color or 0xFF000000.toInt())
         paint.alpha = (color ushr 24)
         var cx = x
         for (raw in text) {
