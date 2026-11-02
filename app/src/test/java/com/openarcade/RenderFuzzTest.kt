@@ -179,4 +179,96 @@ class RenderFuzzTest {
             app.destroy()
         }
     }
+
+    // ------------------------------------------------------------------ Meowdoku gameplay
+    private fun newMeow(d: Difficulty = Difficulty.EASY): Pair<com.openarcade.games.meowdoku.MeowdokuSession, FakeHost> {
+        val def = GameRegistry.byId("meowdoku")!!
+        val host = FakeHost(def, d, 6f)
+        val s = def.factory(host) as com.openarcade.games.meowdoku.MeowdokuSession
+        val area = RectF(0f, 0f, 1080f, 1700f)
+        s.layout(area); s.start(null)
+        var k = 0
+        while (s.puzzleForTest == null && k++ < 400) { Thread.sleep(10); s.step(0.016f) }
+        s.layout(area)
+        return s to host
+    }
+
+    @Test fun meowdokuWrongCatsCostHeartsAndCanLose() {
+        val (s, host) = newMeow()
+        val p = s.puzzleForTest!!
+        val wrong = (0 until p.n * p.n).filter { !p.isSolutionCat(it) }
+        s.setMarkForTest(wrong[0], com.openarcade.games.meowdoku.Mark.CAT)
+        assertTrue(s.heartsForTest == 2)
+        // a wrong cat is rejected and the cell is shown as impossible
+        assertTrue(s.marksForTest[wrong[0]] == com.openarcade.games.meowdoku.Mark.X)
+        s.setMarkForTest(wrong[1], com.openarcade.games.meowdoku.Mark.CAT)
+        s.setMarkForTest(wrong[2], com.openarcade.games.meowdoku.Mark.CAT)
+        assertTrue(s.heartsForTest == 0)
+        assertTrue(s.finished)
+        repeat(100) { s.step(0.02f) }
+        assertTrue(host.result?.won == false)
+    }
+
+    @Test fun meowdokuSolvingWinsAndBoardObeysAllRules() {
+        for (d in Difficulty.values()) {
+            val (s, host) = newMeow(d)
+            val p = s.puzzleForTest!!
+            for (r in 0 until p.n) s.setMarkForTest(r * p.n + p.solution[r], com.openarcade.games.meowdoku.Mark.CAT)
+            assertTrue(s.finished)
+            repeat(120) { s.step(0.02f) }
+            assertTrue("won on $d", host.result?.won == true)
+            val cats = s.marksForTest.indices.filter { s.marksForTest[it] == com.openarcade.games.meowdoku.Mark.CAT }
+            assertTrue(cats.size == p.n)
+            val cols = IntArray(p.n) { r -> cats.first { it / p.n == r } % p.n }
+            assertTrue(com.openarcade.games.meowdoku.MeowLogic.isValidSolution(p.n, p.regions, cols))
+            assertTrue(host.ints["lvl_${d.ordinal}"] == 1)   // progression advanced
+        }
+    }
+
+    @Test fun meowdokuHintsAloneSolveThePuzzle() {
+        val (s, host) = newMeow(Difficulty.HARD)
+        val hint = s.actions().first { it.label == "HINT" }
+        var guard = 0
+        while (!s.finished && guard++ < 500) { hint.onClick(); hint.onClick() }   // show, then apply
+        assertTrue(s.finished)
+        repeat(120) { s.step(0.02f) }
+        assertTrue(host.result?.won == true)
+        assertTrue(s.heartsForTest == 3)
+    }
+
+    @Test fun meowdokuSaveRestoreAndUndo() {
+        val (s, host) = newMeow(Difficulty.NORMAL)
+        val p = s.puzzleForTest!!
+        val cat = p.solution[0]
+        s.setMarkForTest(cat, com.openarcade.games.meowdoku.Mark.CAT)
+        val wrong = (0 until p.n * p.n).first { !p.isSolutionCat(it) && s.marksForTest[it] == 0 }
+        s.setMarkForTest(wrong, com.openarcade.games.meowdoku.Mark.CAT)   // -1 heart
+        val x = (0 until p.n * p.n).first { s.marksForTest[it] == 0 }
+        s.setMarkForTest(x, com.openarcade.games.meowdoku.Mark.X)
+        val saved = org.json.JSONObject(s.save()!!.toString())
+        val s2 = GameRegistry.byId("meowdoku")!!.factory(host) as com.openarcade.games.meowdoku.MeowdokuSession
+        s2.layout(RectF(0f, 0f, 1080f, 1700f)); s2.start(saved)
+        assertTrue(s2.marksForTest.contentEquals(s.marksForTest))
+        assertTrue(s2.heartsForTest == 2)
+        assertTrue(s2.puzzleForTest!!.regions.contentEquals(p.regions))
+        // undo removes the last X but never refunds a heart
+        s.undoForTest()
+        assertTrue(s.marksForTest[x] == 0)
+        assertTrue(s.heartsForTest == 2)
+    }
+
+    @Test fun musicToggleWorksAndPersists() {
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val app = ArcadeApp(ctx) {}
+        val before = app.audio.musicEnabled
+        app.toggleMusic()
+        assertTrue(app.audio.musicEnabled == !before)
+        assertTrue(app.storage.musicOn == !before)
+        // a fresh app instance (e.g. after restart) picks up the saved preference
+        val app2 = ArcadeApp(ctx) {}
+        assertTrue(app2.audio.musicEnabled == !before)
+        app.toggleMusic()
+        assertTrue(app.storage.musicOn == before)
+        app.destroy(); app2.destroy()
+    }
 }

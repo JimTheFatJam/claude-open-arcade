@@ -186,6 +186,13 @@ class MeowdokuSession(host: GameHost) : GameSession(host) {
         }
     }
 
+    // ---- hooks for automated tests
+    internal val puzzleForTest: MeowPuzzle? get() = puzzle
+    internal val marksForTest: IntArray get() = marks
+    internal val heartsForTest: Int get() = hearts
+    internal fun setMarkForTest(i: Int, v: Int) = setMark(i, v)
+    internal fun undoForTest() = undo()
+
     override fun start(saved: JSONObject?) {
         if (saved != null) {
             val sn = saved.getInt("n")
