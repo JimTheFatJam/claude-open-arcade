@@ -102,7 +102,10 @@ class UpdateScreen(app: ArcadeApp) : Screen(app) {
         val textW = w - p * 12
         val showNotes = s.release != null && s.phase in setOf(Phase.AVAILABLE, Phase.ERROR, Phase.READY, Phase.DOWNLOADING, Phase.VERIFYING)
         val bodyH = Gfx.paragraphHeight(bodyText().first, textW, app.tSmall)
-        val notesH = if (showNotes) minOf(p * 90, content.height() * 0.4f) else 0f
+        // changelog box fits its text (scrollable beyond ~40% of the screen)
+        val notesText = s.release?.notes?.ifBlank { "NO RELEASE NOTES." } ?: ""
+        val notesH = if (showNotes) minOf(maxOf(p * 20, Gfx.paragraphHeight(notesText, w - p * 20, app.tSmall) + p * 8),
+            p * 90, content.height() * 0.4f) else 0f
         val progressH = if (s.phase == Phase.DOWNLOADING || s.phase == Phase.VERIFYING) p * 22 else 0f
         val h = p * 14 + PixelFont.height(app.tBody) + p * 8 +          // title
             (if (s.release != null) PixelFont.height(app.tSmall) * 2 + p * 12 else PixelFont.height(app.tSmall) + p * 8) +  // versions
