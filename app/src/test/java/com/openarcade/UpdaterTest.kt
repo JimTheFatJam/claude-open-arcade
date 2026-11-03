@@ -17,6 +17,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
@@ -55,6 +58,9 @@ class FakeHttp(private val routes: Map<String, (Map<String, String>) -> HttpClie
     }
 }
 
+/** Runs under Robolectric so org.json is the real implementation (AGP's android.jar stubs it). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class UpdaterTest {
     private val cfg = AppUpdateConfig.CONFIG
 
