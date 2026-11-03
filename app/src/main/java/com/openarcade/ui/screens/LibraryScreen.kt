@@ -150,7 +150,7 @@ class LibraryScreen(app: ArcadeApp) : Screen(app) {
         keys.add(Button("DEL", Icons.BACK, Pal.RED, Sfx.BACK) { if (query.isNotEmpty()) { query = query.dropLast(1); rebuild() } })
             .set(x0, y, x0 + bw3, y + kh)
         keys.add(Button("SPACE", null, Pal.BG3, Sfx.CLICK) { type(' ') }).set(x0 + bw3 + gap, y, x0 + bw3 * 2 + gap, y + kh)
-        keys.add(Button("DONE", Icons.CHECK, Pal.GREEN) { keyboardOpen = false; rebuild() })
+        keys.add(Button("DONE", Icons.CHECK, Pal.DGREEN) { keyboardOpen = false; rebuild() })
             .set(x0 + (bw3 + gap) * 2, y, x0 + maxW, y + kh)
     }
 

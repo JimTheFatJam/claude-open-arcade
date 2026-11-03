@@ -73,7 +73,7 @@ class TutorialScreen(app: ArcadeApp, private val def: GameDef, private val onDon
             .set(x0, y, x0 + bw, y + bh)
         buttons.add(Button("", Icons.BACK, Pal.BG3, Sfx.CLICK) { prev() }).also { it.enabled = page > 0 }
             .set(x0 + bw + gap, y, x0 + bw * 2 + gap, y + bh)
-        val nb = if (last) Button("PLAY!", Icons.PLAY, Pal.GREEN, Sfx.START) { finish() }.also { it.textColor = Pal.BLACK }
+        val nb = if (last) Button("PLAY!", Icons.PLAY, Pal.DGREEN, Sfx.START) { finish() }
         else Button("NEXT", null, Pal.BLUE, Sfx.CLICK) { next() }
         buttons.add(nb).set(x0 + (bw + gap) * 2, y, x0 + rowW, y + bh)
         // create this page's interactive demo once

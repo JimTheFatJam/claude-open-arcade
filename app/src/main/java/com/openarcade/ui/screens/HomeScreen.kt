@@ -75,7 +75,7 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
         featBox.set(left, y, left + colW, y + fh)
         val f = featured[featIndex]
         val bw = minOf(p * 44, colW * 0.4f)
-        buttons.add(Button("PLAY", Icons.PLAY, Pal.GREEN) { openGame(f) }.also { it.textColor = Pal.BLACK })
+        buttons.add(Button("PLAY", Icons.PLAY, Pal.DGREEN) { openGame(f) })
             .set(featBox.right - bw - p * 5, featBox.bottom - p * 22, featBox.right - p * 5, featBox.bottom - p * 6)
         if (featured.size > 1) {
             val ab = p * 14

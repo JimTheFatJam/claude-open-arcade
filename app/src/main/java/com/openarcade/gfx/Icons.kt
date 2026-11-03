@@ -80,15 +80,17 @@ object Icons {
         ".W.......",
     )
     val RESTART = PixelArt(
-        "...WWWW..",
-        "..W....W.",
-        ".W......W",
-        ".W.......",
-        ".W.......",
-        "WWW.....W",
-        ".W.....W.",
-        "..WWWWW..",
-        ".........",
+        "...WWWWW...",
+        "..WWWWWWW..",
+        ".WWW...WWW.",
+        "WWW...WWWWW",
+        "WW.....WWW.",
+        "WW......W..",
+        "WW.........",
+        "WWW........",
+        ".WWW...WW..",
+        "..WWWWWWW..",
+        "...WWWWW...",
     )
     val HELP = PixelArt(
         "..WWWWW..",

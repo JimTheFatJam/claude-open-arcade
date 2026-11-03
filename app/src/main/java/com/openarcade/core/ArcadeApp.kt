@@ -233,6 +233,12 @@ class ArcadeApp(val context: Context, private val invalidate: () -> Unit) {
         barButtons.add(Button("", musicIcon, if (audio.musicEnabled) Pal.DBLUE else Pal.DGREY, Sfx.CLICK) { toggleMusic() })
             .set(right - bs, y0, right, y0 + bs)
         right -= bs + p * 2
+        // settings are one tap away from every screen
+        if (s !is com.openarcade.ui.screens.SettingsScreen) {
+            barButtons.add(Button("", Icons.GEAR, Pal.BG2, Sfx.CLICK) { push(com.openarcade.ui.screens.SettingsScreen(this)) })
+                .set(right - bs, y0, right, y0 + bs)
+            right -= bs + p * 2
+        }
         for (bb in s.barButtons().reversed()) {
             val b = Button("", bb.icon(), bb.tint() ?: Pal.BG2, Sfx.CLICK) { bb.onClick() }
             barButtons.add(b).set(right - bs, y0, right, y0 + bs)

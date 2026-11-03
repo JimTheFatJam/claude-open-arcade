@@ -68,9 +68,13 @@ object Gfx {
             Align.CENTER -> x - w / 2
             Align.RIGHT -> x - w
         }
-        if (shadow != null) PixelFont.draw(c, s, lx + size, y + size, size, shadow)
+        // dark text never gets a black drop shadow (it just looks smudged)
+        if (shadow != null && luminance(color) > 0.25f) PixelFont.draw(c, s, lx + size, y + size, size, shadow)
         PixelFont.draw(c, s, lx, y, size, color)
     }
+
+    private fun luminance(c: Int): Float =
+        (0.299f * ((c shr 16) and 255) + 0.587f * ((c shr 8) and 255) + 0.114f * (c and 255)) / 255f
 
     /** Text vertically centred on [cy]. */
     fun textMid(c: Canvas, s: String, x: Float, cy: Float, size: Float, color: Int, align: Align = Align.CENTER, shadow: Int? = Pal.BLACK) =

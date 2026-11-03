@@ -43,8 +43,8 @@ class SettingsScreen(app: ArcadeApp) : Screen(app) {
         fun toggle(label: String, get: () -> Boolean, set: (Boolean) -> Unit) {
             rows.add(Row(label, y) { "" })
             val on = get()
-            val b = Button(if (on) "ON" else "OFF", null, if (on) Pal.GREEN else Pal.DGREY, Sfx.CLICK) { set(!get()); rebuild() }
-            b.textColor = if (on) Pal.BLACK else Pal.WHITE
+            val b = Button(if (on) "ON" else "OFF", null, if (on) Pal.DGREEN else Pal.DGREY, Sfx.CLICK) { set(!get()); rebuild() }
+            b.textColor = Pal.WHITE
             buttons.add(b).set(right - p * 36, y + p * 2, right, y + rh - p * 2)
             y += rh + p * 3
         }

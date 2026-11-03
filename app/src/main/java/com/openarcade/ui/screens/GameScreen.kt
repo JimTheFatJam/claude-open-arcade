@@ -136,6 +136,8 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
     }
 
     override fun exit() {
+        // leaving for another screen (e.g. settings from the top bar) pauses the round first
+        if (state == State.PLAYING) pause(silent = true)
         saveProgress()
     }
 
@@ -329,8 +331,8 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
                     layoutMenu()
                 }
                 b.active = d == _difficulty
-                b.color = if (b.active) def.accent else Pal.BG2
-                b.textColor = if (b.active) Pal.BLACK else Pal.WHITE
+                b.color = if (b.active) Pal.darker(def.accent, 0.35f) else Pal.BG2
+                b.textColor = Pal.WHITE
                 b.textSize = app.tSmall
                 menuButtons.add(b).set(x, y, x + bw, y + p * 15)
             }
@@ -338,12 +340,12 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         }
         val bh = p * 20
         if (app.storage.hasSave(def.id)) {
-            menuButtons.add(Button("CONTINUE", Icons.PLAY, Pal.GREEN) { play(true) }.also { it.textColor = Pal.BLACK })
+            menuButtons.add(Button("CONTINUE", Icons.PLAY, Pal.DGREEN) { play(true) })
                 .set(m.colLeft, y, m.colRight, y + bh)
             y += bh + gap
             menuButtons.add(Button("NEW GAME", Icons.RESTART, Pal.BLUE) { play(false) }).set(m.colLeft, y, m.colRight, y + bh)
         } else {
-            menuButtons.add(Button("PLAY", Icons.PLAY, Pal.GREEN) { play(false) }.also { it.textColor = Pal.BLACK })
+            menuButtons.add(Button("PLAY", Icons.PLAY, Pal.DGREEN) { play(false) })
                 .set(m.colLeft, y, m.colRight, y + bh)
         }
         y += bh + gap
@@ -381,18 +383,24 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
                 overlayBox.set((app.w - w) / 2, content.centerY() - total / 2, (app.w + w) / 2, content.centerY() + total / 2)
                 var y = overlayBox.top + p * 20
                 labels.forEachIndexed { i, (l, ic, fn) ->
-                    val b = Button(l, ic, if (i == 0) Pal.GREEN else Pal.BG3) { fn() }
-                    if (i == 0) b.textColor = Pal.BLACK
-                    overlayButtons.add(b).set(overlayBox.left + p * 6, y, overlayBox.right - p * 6, y + bh)
+                    val b = Button(l, ic, if (i == 0) Pal.DGREEN else Pal.BG3) { fn() }
+                                        overlayButtons.add(b).set(overlayBox.left + p * 6, y, overlayBox.right - p * 6, y + bh)
                     y += bh + gap
                 }
             }
             State.OVER -> {
-                val total = p * 92
+                // height = title + every text line + "new best" + buttons, so nothing overlaps
+                val r = result
+                val title = r?.title ?: if (r?.won == true) "YOU WIN!" else "GAME OVER"
+                val ts = Gfx.fitSize(title, w - p * 10, app.tBody * 2f)
+                var textH = p * 14 + PixelFont.height(ts)
+                for ((txt, _) in overLines()) textH += PixelFont.height(Gfx.fitSize(txt, w - p * 10, app.tBody)) + p * 5
+                if (record?.newBest == true) textH += PixelFont.height(app.tSmall) + p * 5
+                val total = textH + p * 4 + bh + p * 6
                 overlayBox.set((app.w - w) / 2, content.centerY() - total / 2, (app.w + w) / 2, content.centerY() + total / 2)
                 val bw = (overlayBox.width() - p * 12 - gap) / 2
                 val y = overlayBox.bottom - p * 6 - bh
-                overlayButtons.add(Button("AGAIN", Icons.RESTART, Pal.GREEN) { startRound(false) }.also { it.textColor = Pal.BLACK })
+                overlayButtons.add(Button("AGAIN", Icons.RESTART, Pal.DGREEN) { startRound(false) })
                     .set(overlayBox.left + p * 6, y, overlayBox.left + p * 6 + bw, y + bh)
                 overlayButtons.add(Button("MENU", Icons.HOME, Pal.BG3) { toMenu() })
                     .set(overlayBox.right - p * 6 - bw, y, overlayBox.right - p * 6, y + bh)
@@ -487,8 +495,8 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
                 val b = actionButtons.buttons[i]
                 b.active = a.isActive()
                 b.enabled = a.isEnabled()
-                b.color = if (b.active) def.accent else Pal.BG3
-                b.textColor = if (b.active) Pal.BLACK else Pal.WHITE
+                b.color = if (b.active) Pal.darker(def.accent, 0.35f) else Pal.BG3
+                b.textColor = Pal.WHITE
             }
         } else buildActions()
         actionButtons.draw(c)
@@ -504,21 +512,9 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
             overlayBox.bottom + p * 5, app.tSmall, Pal.GREY, Align.CENTER)
     }
 
-    private fun drawOver(c: Canvas) {
-        val r = result ?: return
-        val p = app.p
-        val k = (overT / 0.3f).coerceIn(0f, 1f)
-        Gfx.rect(c, 0f, content.top, app.w, app.h, Pal.withAlpha(Pal.BLACK, (150 * k).toInt()))
-        val drop = (1f - k) * p * 40
-        c.save()
-        c.translate(0f, -drop)
-        val color = if (r.won) Pal.GREEN else Pal.RED
-        Gfx.panel(c, overlayBox, Pal.BG1, color, p)
-        val title = r.title ?: if (r.won) "YOU WIN!" else "GAME OVER"
-        val ts = Gfx.fitSize(title, overlayBox.width() - p * 10, app.tBody * 2f)
-        val wave = sin(t * 5f) * p
-        Gfx.text(c, title, overlayBox.centerX(), overlayBox.top + p * 8 + wave, ts, color, Align.CENTER)
-        var y = overlayBox.top + p * 14 + PixelFont.height(ts)
+    /** The text lines of the results panel (shared by layout and drawing so they always agree). */
+    private fun overLines(): List<Pair<String, Int>> {
+        val r = result ?: return emptyList()
         val lines = ArrayList<Pair<String, Int>>()
         r.detail?.let { lines.add(it to Pal.LGREY) }
         val rec = record
@@ -537,13 +533,32 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
                 if (st.streak > 1) lines.add("WIN STREAK  ${st.streak}" to Pal.YELLOW)
             }
         }
-        for ((txt, col) in lines) {
+        return lines
+    }
+
+    private fun drawOver(c: Canvas) {
+        val r = result ?: return
+        val p = app.p
+        val k = (overT / 0.3f).coerceIn(0f, 1f)
+        Gfx.rect(c, 0f, content.top, app.w, app.h, Pal.withAlpha(Pal.BLACK, (150 * k).toInt()))
+        val drop = (1f - k) * p * 40
+        c.save()
+        c.translate(0f, -drop)
+        val color = if (r.won) Pal.GREEN else Pal.RED
+        Gfx.panel(c, overlayBox, Pal.BG1, color, p)
+        val title = r.title ?: if (r.won) "YOU WIN!" else "GAME OVER"
+        val ts = Gfx.fitSize(title, overlayBox.width() - p * 10, app.tBody * 2f)
+        val wave = sin(t * 5f) * p
+        Gfx.text(c, title, overlayBox.centerX(), overlayBox.top + p * 8 + wave, ts, color, Align.CENTER)
+        var y = overlayBox.top + p * 14 + PixelFont.height(ts)
+        val rec = record
+        for ((txt, col) in overLines()) {
             val sz = Gfx.fitSize(txt, overlayBox.width() - p * 10, app.tBody)
             Gfx.text(c, txt, overlayBox.centerX(), y, sz, col, Align.CENTER)
             y += PixelFont.height(sz) + p * 5
         }
         if (rec?.newBest == true && app.blink(2f) > 0.3f) {
-            Gfx.text(c, "${PixelFont.STAR} NEW BEST! ${PixelFont.STAR}", overlayBox.centerX(), y + p * 2, app.tSmall, Pal.YELLOW, Align.CENTER)
+            Gfx.text(c, "${PixelFont.STAR} NEW BEST! ${PixelFont.STAR}", overlayBox.centerX(), y + p, app.tSmall, Pal.YELLOW, Align.CENTER)
         }
         c.restore()
         if (k >= 1f) overlayButtons.draw(c)

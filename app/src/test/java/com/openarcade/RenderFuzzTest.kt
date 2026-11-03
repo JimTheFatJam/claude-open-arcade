@@ -174,6 +174,12 @@ class RenderFuzzTest {
                     s.actions().first { it.label == "HINT" }.onClick()
                 }
                 shot("$id-play", 10)
+                if (id == "meowdoku") {
+                    gs.key(android.view.KeyEvent.KEYCODE_P); shot("meowdoku-paused", 5)
+                    gs.key(android.view.KeyEvent.KEYCODE_P)
+                    gs.gameOver(GameResult(true, null, 110, null, "LEVEL 1  6X6  HEARTS \u0001\u0001\u0001"))
+                    shot("meowdoku-win", 40)
+                }
                 app.pop(false)
             }
             app.destroy()
