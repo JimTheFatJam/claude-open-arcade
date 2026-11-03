@@ -67,6 +67,7 @@ class LightsOutSession(host: GameHost) : GameSession(host) {
         if (saved != null) {
             val on = saved.getJSONArray("on").toIntArray()
             val ts = saved.getJSONArray("ts").toIntArray()
+            require(on.size == n * n && ts.size == n * n) { "save is for a different board size" }
             for (i in 0 until n * n) { board.on[i] = on[i] == 1; board.toSolve[i] = ts[i] == 1 }
             moves = saved.getInt("moves"); par = saved.getInt("par"); hints = saved.optInt("hints")
         } else {

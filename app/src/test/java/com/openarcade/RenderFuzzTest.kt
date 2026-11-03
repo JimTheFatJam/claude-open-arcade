@@ -277,4 +277,117 @@ class RenderFuzzTest {
         assertTrue(app.storage.musicOn == before)
         app.destroy(); app2.destroy()
     }
+
+    // ------------------------------------------------------------------ saved games vs difficulty
+    private fun playSome(gs: com.openarcade.ui.screens.GameScreen, app: ArcadeApp, c: Canvas, rnd: Random) {
+        val s = gs.sessionForTest ?: return
+        repeat(120) { k ->
+            if (k % 3 == 0) {
+                val a = s.area
+                val x = a.left + rnd.nextFloat() * a.width(); val y = a.top + rnd.nextFloat() * a.height()
+                val dx = (rnd.nextFloat() - 0.5f) * a.width() * 0.5f; val dy = (rnd.nextFloat() - 0.5f) * a.height() * 0.5f
+                gs.touch(ev(MotionEvent.ACTION_DOWN, x, y))
+                gs.touch(ev(MotionEvent.ACTION_MOVE, x + dx / 2, y + dy / 2))
+                gs.touch(ev(MotionEvent.ACTION_MOVE, x + dx, y + dy))
+                gs.touch(ev(MotionEvent.ACTION_UP, x + dx, y + dy))
+            }
+            app.frame(c)
+            if (k % 30 == 0) Thread.sleep(15)
+        }
+    }
+
+    /** The reported bug: 2048 played at 3x3, quit, switch to 4x4, continue -> crash (twice). */
+    @Test fun game2048ContinueAfterChangingBoardSize() {
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val app = ArcadeApp(ctx) {}
+        app.resize(1080, 2340)
+        val c = Canvas(Bitmap.createBitmap(1080, 2340, Bitmap.Config.ARGB_8888))
+        val def = GameRegistry.byId("2048")!!
+        app.storage.setTutorialSeen(def.id)
+        val gs = com.openarcade.ui.screens.GameScreen(app, def)
+        app.replaceAll(gs, animate = false)
+        gs.selectDifficultyForTest(Difficulty.HARD)          // 3x3
+        gs.startRoundForTest()
+        playSome(gs, app, c, Random(1))
+        gs.quitToMenuForTest()
+        assertTrue(app.storage.hasSave(def.id))
+        gs.selectDifficultyForTest(Difficulty.NORMAL)        // 4x4
+        gs.continueForTest()
+        playSome(gs, app, c, Random(2))
+        assertTrue(gs.crashesForTest == 0)
+        assertTrue(gs.stateForTest == "PLAYING")
+        assertTrue("continues the 3x3 round", gs.difficultyForTest == Difficulty.HARD)
+        // re-opening the app and continuing again also works
+        gs.quitToMenuForTest()
+        val gs2 = com.openarcade.ui.screens.GameScreen(app, def)
+        app.replaceAll(gs2, animate = false)
+        gs2.continueForTest(); playSome(gs2, app, c, Random(3))
+        assertTrue(gs2.crashesForTest == 0 && gs2.stateForTest == "PLAYING")
+        app.destroy()
+    }
+
+    /** Every game: save at difficulty A, switch the menu to B, continue. Must resume at A without errors. */
+    @Test fun everyGameContinuesSafelyAcrossDifficulties() {
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val app = ArcadeApp(ctx) {}
+        app.resize(1080, 2340)
+        val c = Canvas(Bitmap.createBitmap(1080, 2340, Bitmap.Config.ARGB_8888))
+        val failures = ArrayList<String>()
+        for (def in GameRegistry.all) {
+            app.storage.setTutorialSeen(def.id)
+            for (a in Difficulty.values()) for (b in Difficulty.values()) {
+                if (a == b) continue
+                val gs = com.openarcade.ui.screens.GameScreen(app, def)
+                app.replaceAll(gs, animate = false)
+                gs.selectDifficultyForTest(a)
+                gs.startRoundForTest()
+                repeat(30) { app.frame(c); Thread.sleep(5) }    // let generators / AI finish
+                playSome(gs, app, c, Random(def.id.hashCode() + a.ordinal))
+                if (gs.stateForTest != "PLAYING") { app.storage.putSave(def.id, null); continue }   // round ended
+                gs.quitToMenuForTest()
+                val hadSave = app.storage.hasSave(def.id)
+                gs.selectDifficultyForTest(b)
+                if (hadSave) {
+                    gs.continueForTest()
+                    playSome(gs, app, c, Random(7))
+                    if (gs.difficultyForTest != a) failures.add("${def.id} $a->$b resumed at ${gs.difficultyForTest}")
+                }
+                if (gs.crashesForTest > 0) failures.add("${def.id} $a->$b: game threw and had to be reset")
+                app.storage.putSave(def.id, null)
+            }
+        }
+        failures.forEach { println("FAIL $it") }
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+        app.destroy()
+    }
+
+    /** Saves written by older versions have no difficulty tag: they must never crash a game either. */
+    @Test fun legacySavesWithoutDifficultyNeverCrash() {
+        val failures = ArrayList<String>()
+        for (def in GameRegistry.all) for (a in Difficulty.values()) {
+            val host = FakeHost(def, a, 6f)
+            val s = def.factory(host)
+            val area = RectF(18f, 250f, 1062f, 2180f)
+            s.layout(area); s.start(null); s.layout(area)
+            repeat(200) { s.step(1 / 60f); if (it % 40 == 0) Thread.sleep(20) }
+            val saved = s.save() ?: continue
+            for (b in Difficulty.values()) {
+                val h2 = FakeHost(def, b, 6f)
+                val s2 = def.factory(h2)
+                s2.layout(area)
+                val restored = try { s2.start(org.json.JSONObject(saved.toString())); true } catch (e: Exception) { false }
+                if (!restored) continue      // rejected at start: the host falls back to a fresh round
+                try {
+                    s2.layout(area)
+                    val bmp = Bitmap.createBitmap(1080, 2340, Bitmap.Config.ARGB_8888)
+                    drive(s2, h2, area, 200, Random(3), Canvas(bmp))
+                    s2.draw(Canvas(bmp)); s2.hud(); s2.save()
+                } catch (e: Throwable) {
+                    failures.add("${def.id} saved at $a, loaded at $b: $e")
+                }
+            }
+        }
+        failures.forEach { println("FAIL $it") }
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+    }
 }

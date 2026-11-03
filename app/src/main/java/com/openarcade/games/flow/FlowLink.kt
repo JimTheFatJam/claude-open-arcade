@@ -126,6 +126,8 @@ class FlowSession(host: GameHost) : GameSession(host) {
             ends = Array(e.length()) { e.getJSONArray(it).toIntArray() }
             val p = saved.getJSONArray("paths")
             paths = ArrayList((0 until p.length()).map { ArrayList(p.getJSONArray(it).toIntArray().toList()) })
+            require(paths.size == ends.size && ends.all { e -> e.size == 2 && e.all { it in 0 until n * n } } &&
+                paths.all { pa -> pa.all { it in 0 until n * n } }) { "save is for a different board size" }
             moves = saved.optInt("moves")
         } else {
             val sol = FlowGenerator.generate(n, host.rng)

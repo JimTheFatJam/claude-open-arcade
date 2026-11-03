@@ -124,7 +124,9 @@ class Game2048Session(host: GameHost) : GameSession(host) {
 
     override fun start(saved: JSONObject?) {
         if (saved != null) {
-            board.cells = saved.getJSONArray("cells").toIntArray()
+            val cells = saved.getJSONArray("cells").toIntArray()
+            require(cells.size == size * size) { "save is for a different board size" }
+            board.cells = cells
             board.score = saved.getInt("score")
             undosLeft = saved.optInt("undos", 3)
             reached = saved.optBoolean("reached")

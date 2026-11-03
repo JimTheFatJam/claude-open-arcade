@@ -165,10 +165,20 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
     internal fun startRoundForTest() = startRound(false)
 
     internal val sessionForTest: GameSession? get() = session
+    internal val stateForTest: String get() = state.name
+    internal val difficultyForTest: Difficulty get() = _difficulty
+    internal var crashesForTest = 0; private set
+    internal fun continueForTest() = startRound(true)
+    internal fun quitToMenuForTest() = toMenu()
+    internal fun selectDifficultyForTest(d: Difficulty) { _difficulty = d; app.storage.setDifficulty(def.id, d.ordinal); layoutMenu() }
 
     private fun startRound(continueSave: Boolean) {
         val saved = if (continueSave) app.storage.savedGame(def.id) else null
         if (!continueSave) app.storage.putSave(def.id, null)
+        // a saved round always resumes at the difficulty it was played at (board sizes differ)
+        savedDifficulty(saved)?.let { d ->
+            if (d != _difficulty) { _difficulty = d; app.storage.setDifficulty(def.id, d.ordinal) }
+        }
         val s = def.factory(this)
         session = s
         _playTime = saved?.optDouble("__time", 0.0)?.toFloat() ?: 0f
@@ -192,6 +202,31 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         if (saved == null) app.progress.roundStarted(def)
         app.audio.play(Sfx.START)
         buildActions()
+    }
+
+    private fun savedDifficulty(saved: org.json.JSONObject?): Difficulty? =
+        if (saved != null && saved.has("__difficulty")) Difficulty.values().getOrNull(saved.optInt("__difficulty")) else null
+
+    /**
+     * Runs a call into the game. If the game throws, the app must not crash (and must not crash
+     * again on the next launch): the round and its save are discarded and the menu is shown.
+     */
+    private inline fun guard(block: () -> Unit) {
+        try { block() } catch (e: Exception) { recoverFromCrash(e) }
+    }
+
+    private inline fun <T> guarded(fallback: T, block: () -> T): T =
+        try { block() } catch (e: Exception) { recoverFromCrash(e); fallback }
+
+    private fun recoverFromCrash(e: Exception) {
+        crashesForTest++
+        android.util.Log.e("OpenArcade", "Game ${def.id} failed; resetting it", e)
+        app.storage.putSave(def.id, null)
+        session = null
+        state = State.MENU
+        confetti.clear()
+        layoutMenu()
+        app.toast("OOPS! THAT GAME HIT A BUG AND WAS RESET")
     }
 
     private fun pause(silent: Boolean = false) {
@@ -236,6 +271,7 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         if (state == State.PLAYING || state == State.PAUSED) {
             val o = try { s.save() } catch (e: Exception) { null }
             o?.put("__time", _playTime.toDouble())
+            o?.put("__difficulty", _difficulty.ordinal)
             app.storage.putSave(def.id, o)
         }
     }
@@ -340,7 +376,9 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         }
         val bh = p * 20
         if (app.storage.hasSave(def.id)) {
-            menuButtons.add(Button("CONTINUE", Icons.PLAY, Pal.DGREEN) { play(true) })
+            val sd = savedDifficulty(app.storage.savedGame(def.id))
+            val label = if (sd != null) "CONTINUE (${def.difficultyName(sd)})" else "CONTINUE"
+            menuButtons.add(Button(label, Icons.PLAY, Pal.DGREEN) { play(true) })
                 .set(m.colLeft, y, m.colRight, y + bh)
             y += bh + gap
             menuButtons.add(Button("NEW GAME", Icons.RESTART, Pal.BLUE) { play(false) }).set(m.colLeft, y, m.colRight, y + bh)
@@ -416,9 +454,9 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
             State.PLAYING -> {
                 _playTime += dt
                 unsavedTime += dt
-                session?.step(dt)
+                guard { session?.step(dt) }
             }
-            State.PAUSED -> if (session?.realtime == false) session?.step(0f)
+            State.PAUSED -> if (session?.realtime == false) guard { session?.step(0f) }
             State.OVER -> { overT += dt }
             State.MENU -> menuScroll.update(dt)
         }
@@ -461,7 +499,7 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         val s = session ?: return
         val p = app.p
         // HUD
-        val items = s.hud()
+        val items = guarded(emptyList()) { s.hud() }
         if (app.landscape) {
             Gfx.panel(c, hudBox, Pal.withAlpha(Pal.BG1, 230), Pal.BG3, p, shadow = false)
             var y = hudBox.top + p * 6
@@ -486,10 +524,10 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
         // game
         c.save()
         c.clipRect(playArea.left - p * 2, playArea.top - p * 2, playArea.right + p * 2, playArea.bottom + p * 2)
-        s.draw(c)
+        guard { s.draw(c) }
         c.restore()
         // actions
-        val acts = s.actions()
+        val acts = guarded(emptyList()) { s.actions() }
         if (acts.size == actionButtons.buttons.size) {
             acts.forEachIndexed { i, a ->
                 val b = actionButtons.buttons[i]
@@ -660,7 +698,7 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
             State.PLAYING -> {
                 if (actionButtons.touch(e)) return true
                 val s = session ?: return false
-                if (!s.finished) s.onTouch(e)
+                if (!s.finished) guard { s.onTouch(e) }
                 return true
             }
             State.PAUSED, State.OVER -> {
@@ -673,7 +711,7 @@ class GameScreen(app: ArcadeApp, override val def: GameDef) : Screen(app), GameH
     override fun key(keyCode: Int): Boolean {
         if (state == State.PLAYING) {
             if (keyCode == KeyEvent.KEYCODE_P || keyCode == KeyEvent.KEYCODE_ESCAPE || keyCode == KeyEvent.KEYCODE_BUTTON_START) { pause(); return true }
-            return session?.onKey(keyCode) ?: false
+            return guarded(false) { session?.onKey(keyCode) ?: false }
         }
         if (state == State.PAUSED && (keyCode == KeyEvent.KEYCODE_P || keyCode == KeyEvent.KEYCODE_BUTTON_START)) { resume(); return true }
         return false

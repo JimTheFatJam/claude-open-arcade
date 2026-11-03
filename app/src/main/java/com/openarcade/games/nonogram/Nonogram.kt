@@ -134,6 +134,7 @@ class NonogramSession(host: GameHost) : GameSession(host) {
             val rows = saved.getJSONArray("pic")
             pic = NonoPicture(saved.getString("name"), List(rows.length()) { rows.getString(it) })
             marks = saved.getJSONArray("marks").toIntArray()
+            require(pic.size == n && pic.rows.all { it.length == n } && marks.size == n * n) { "save is for a different board size" }
             hints = saved.optInt("hints")
         } else {
             level = host.getInt("lvl_$n")
