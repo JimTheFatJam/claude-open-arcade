@@ -91,7 +91,7 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
         val nbh = p * 20
         val nav = listOf(
             Triple("LIBRARY", Icons.LIBRARY, Pal.BLUE) to { app.push(LibraryScreen(app)) },
-            Triple("AWARDS", Icons.TROPHY, Pal.ORANGE) to { app.push(AchievementsScreen(app)) },
+            Triple("AWARDS", Icons.TROPHY, Pal.DRED) to { app.push(AchievementsScreen(app)) },
             Triple("STATS", Icons.CHART, Pal.PURPLE) to { app.push(StatsScreen(app)) },
             Triple("SETTINGS", Icons.GEAR, Pal.DGREY) to { app.push(SettingsScreen(app)) },
         )
