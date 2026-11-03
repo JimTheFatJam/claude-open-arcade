@@ -2,7 +2,8 @@
 
 A pocket-sized retro game console for Android. It has 16 fully playable classic, puzzle, arcade and
 board games, all with the same 8-bit pixel-art look and an original chiptune soundtrack. It works
-**100% offline**: no ads, no accounts, no subscriptions, and no internet permission.
+**100% offline**: no ads, no accounts and no subscriptions. The only network use is an optional,
+Wi-Fi-only check for app updates on GitHub (see [Automatic updates](#automatic-updates)).
 
 ## Games
 
@@ -65,6 +66,47 @@ Layouts are measured in "art pixels" of about 2.4dp (20% larger on tablets), so 
 keep a comfortable physical size on any screen. Wide screens (tablets, phones in landscape) get
 side-by-side layouts: two-column home, game menus, stats and awards; tutorials with the
 explanation next to the playable demo; and game boards centered with their controls beside them.
+
+## Automatic updates
+
+Installed copies keep themselves up to date from this repository's GitHub releases. The code is in
+`app/src/main/java/com/openarcade/update/`, and its core has no dependency on the game.
+
+- **When it checks:** on each app launch, and only on Wi-Fi. There are no checks or downloads on
+  mobile data or offline, and no background services. Players can turn the automatic check off,
+  or check by hand, in **Settings → Updates**.
+- **How it finds updates:** it calls the GitHub Releases API (`releases/latest`) and compares the
+  tag (`v1.2.0`) with the installed `versionName`. GitHub rate limits are respected.
+- **Never mid-game:** an available update is offered on the home screen. The dialog shows the
+  installed version, the latest version, the changelog (from `CHANGELOG.md`), download progress
+  and install instructions.
+- **Downloads:** they go to app-private cache storage. Interrupted downloads resume, and they stop
+  if Wi-Fi drops.
+- **Checks before installing:** an APK must pass every one of these, or it's deleted:
+  - its SHA-256 matches GitHub's asset digest or the published `.sha256` file
+  - it's the same package
+  - its versionCode is newer
+  - it's compatible with the device's SDK
+  - it's signed with the same certificate as the installed app and with the pinned release
+    certificate
+- **Installing:** Android's `PackageInstaller` shows its own confirmation screen. The first time,
+  Android also asks the player to allow installs from Open Arcade. Nothing bypasses Play Protect
+  or any system prompt. Old downloads and abandoned install sessions are cleaned up on launch.
+
+To reuse it in another app, change `AppUpdateConfig` (owner, repository, APK asset pattern,
+certificate fingerprint) and keep the release convention:
+- a tag `v<versionName>`
+- an asset `<Name>-v<version>.apk` plus `.sha256`
+- release notes taken from `CHANGELOG.md`
+
+The `Release APK` workflow produces exactly this. It also fails if the tag and `versionName`
+disagree.
+
+### Releasing a new version
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
+2. Add a `## [x.y.z]` section to `CHANGELOG.md`.
+3. Push, then run **Actions → Release APK** with tag `vx.y.z`, or push that tag.
 
 ## Building
 

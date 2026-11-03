@@ -92,6 +92,17 @@ object Icons {
         "..WWWWWWW..",
         "...WWWWW...",
     )
+    val DOWNLOAD = PixelArt(
+        "...WWW...",
+        "...WWW...",
+        "...WWW...",
+        ".WWWWWWW.",
+        "..WWWWW..",
+        "...WWW...",
+        "W...W...W",
+        "W.......W",
+        "WWWWWWWWW",
+    )
     val HELP = PixelArt(
         "..WWWWW..",
         ".WW...WW.",

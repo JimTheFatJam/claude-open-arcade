@@ -11,8 +11,8 @@ android {
         applicationId = "com.openarcade"
         minSdk = 21
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.1.3"
+        versionCode = 6
+        versionName = "1.2.0"
         testInstrumentationRunner = "android.test.InstrumentationTestRunner"
     }
 
@@ -37,6 +37,10 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
+    }
+
+    buildFeatures {
+        buildConfig = true   // VERSION_NAME / VERSION_CODE for the updater and UI
     }
 
     compileOptions {

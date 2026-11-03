@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Open Arcade is fully offline: no INTERNET permission is requested. -->
+    <!-- All games play fully offline. The network is used for one thing only: checking GitHub
+         for app updates over Wi-Fi (can be turned off in Settings). -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Lets the app hand a verified update to Android's installer; the user still confirms. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="true"
@@ -26,5 +31,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Receives PackageInstaller results for self-updates (explicit intents only). -->
+        <receiver
+            android:name=".update.InstallResultReceiver"
+            android:exported="false" />
     </application>
 </manifest>

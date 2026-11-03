@@ -59,7 +59,7 @@ class SplashScreen(app: ArcadeApp) : Screen(app) {
         if (t > 1.2f && app.blink(1.2f) > 0.3f) {
             Gfx.text(c, "TAP TO START", app.w / 2, app.h * 0.78f, app.tBody, Pal.YELLOW, Align.CENTER)
         }
-        Gfx.text(c, "${icons.size} GAMES  -  100% OFFLINE", app.w / 2, app.h - p * 14, app.tSmall, Pal.GREY, Align.CENTER)
+        Gfx.text(c, "${icons.size} GAMES  -  PLAYS 100% OFFLINE", app.w / 2, app.h - p * 14, app.tSmall, Pal.GREY, Align.CENTER)
     }
 
     companion object {

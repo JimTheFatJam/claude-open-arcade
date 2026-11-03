@@ -182,10 +182,20 @@ class ArcadeApp(val context: Context, private val invalidate: () -> Unit) {
             }
         }
         bg.update(dt)
+        maybeShowUpdate()
         val t = top
         if (dialog == null) t?.update(dt)
         val it = toasts.iterator()
         while (it.hasNext()) { val ts = it.next(); ts.t += dt; if (ts.t > 2.6f) it.remove() }
+    }
+
+    /** An update found by the launch check is offered on the home screen only, never mid-game. */
+    private fun maybeShowUpdate() {
+        val um = com.openarcade.update.UpdateManager
+        if (!um.isInitialized || !um.autoPopupPending || transDir != 0 || dialog != null) return
+        if (top !is com.openarcade.ui.screens.HomeScreen) return
+        um.autoPopupPending = false
+        pushOverlay(com.openarcade.ui.screens.UpdateScreen(this))
     }
 
     private fun draw(c: Canvas) {

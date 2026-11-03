@@ -1,6 +1,7 @@
 package com.openarcade
 
-/** App version shown in the UI. Keep in sync with versionName in app/build.gradle.kts. */
+/** App version shown in the UI and used by the updater. Defined once, in app/build.gradle.kts. */
 object BuildInfo {
-    const val VERSION = "1.1.3"
+    const val VERSION: String = BuildConfig.VERSION_NAME
+    const val VERSION_CODE: Int = BuildConfig.VERSION_CODE
 }

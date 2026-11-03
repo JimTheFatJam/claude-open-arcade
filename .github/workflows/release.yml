@@ -27,6 +27,14 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      - name: Check tag matches versionName
+        run: |
+          VN=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts | head -1)
+          if [ "v$VN" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match versionName $VN in app/build.gradle.kts"
+            exit 1
+          fi
+
       - name: Decode signing keystore (if configured)
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -58,20 +66,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cat > notes.md <<NOTES
-          ## Open Arcade $TAG
-
-          An offline retro game console for Android (5.0+) with 16 games:
-          Minesweeper, 2048, Sudoku, Meowdoku, Nonogram, Flow Link, Unblock, Lights Out,
-          Tetromino, Snake, Maze Muncher, Brick Breaker, Paddle Ball, Alien Invasion, Chess and Checkers.
-
-          No ads, no accounts, no internet permission.
-
-          **Install:** download \`OpenArcade-$TAG.apk\` on your phone and open it
-          (allow "install unknown apps" for your browser or file manager when prompted).
-          NOTES
+          # Release notes = this version's CHANGELOG.md section (shown by the in-app updater),
+          # then install instructions after a '---' line (the updater ignores everything after it).
+          VER="${TAG#v}"
+          awk -v ver="$VER" '
+            $0 ~ "^## \\[" ver "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "- Open Arcade $TAG" > notes.md; fi
+          {
+            echo ""
+            echo "---"
+            echo "**Install:** download \`OpenArcade-$TAG.apk\` on your Android phone or tablet (5.0+) and open it."
+            echo "Installed copies update themselves: the game checks for new releases on Wi-Fi."
+          } >> notes.md
+          cat notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
           else
             gh release create "$TAG" dist/* --title "Open Arcade $TAG" --notes-file notes.md --target "$GITHUB_SHA"
           fi

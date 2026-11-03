@@ -79,6 +79,19 @@ class SettingsScreen(app: ArcadeApp) : Screen(app) {
         }
         y += rh + p * 3
         y += p * 4
+        header("UPDATES")
+        val um = com.openarcade.update.UpdateManager
+        rows.add(Row("INSTALLED VERSION  V${com.openarcade.BuildInfo.VERSION}", y) { "" })
+        y += rh + p * 3
+        toggle("AUTO-CHECK ON WI-FI", { um.isInitialized && um.autoCheck }) { if (um.isInitialized) um.autoCheck = it }
+        val ust = um.state
+        val offered = ust.release != null && ust.phase != com.openarcade.update.UpdateManager.Phase.IDLE
+        buttons.add(Button(if (offered) "UPDATE V${ust.release!!.version} AVAILABLE" else "CHECK FOR UPDATES", Icons.DOWNLOAD,
+            if (offered) Pal.DGREEN else Pal.BLUE) {
+            if (!offered) um.check(manual = true)
+            app.pushOverlay(UpdateScreen(app))
+        }).set(left, y, right, y + rh)
+        y += rh + p * 10
         header("DATA")
         buttons.add(Button("REPLAY ALL TUTORIALS", Icons.HELP, Pal.PURPLE) {
             st.resetTutorials(); app.toast("TUTORIALS WILL SHOW AGAIN", Icons.HELP)
@@ -154,7 +167,8 @@ class SettingsScreen(app: ArcadeApp) : Screen(app) {
 
     companion object {
         val ABOUT = "OPEN ARCADE V${com.openarcade.BuildInfo.VERSION}\nA pocket retro console of original-style classic games.\n" +
-            "No ads, no accounts, no internet. All music and sound is synthesised on your device. " +
+            "No ads, no accounts. Every game plays fully offline and all music and sound is synthesised on your device. " +
+            "The only network use is a quick update check on GitHub over Wi-Fi, which you can turn off above. " +
             "All progress is stored only on this device."
     }
 }

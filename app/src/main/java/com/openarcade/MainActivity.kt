@@ -22,6 +22,9 @@ class MainActivity : Activity() {
         setContentView(view)
         view.app.applyOrientation()
         view.app.replaceAll(SplashScreen(view.app), animate = false)
+        // Quiet update check on launch: Wi-Fi only, in the background, never blocks the game.
+        com.openarcade.update.UpdateManager.init(this)
+        com.openarcade.update.UpdateManager.checkOnLaunch()
         view.requestFocus()
     }
 

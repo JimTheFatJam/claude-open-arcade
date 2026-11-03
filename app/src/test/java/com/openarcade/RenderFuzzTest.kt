@@ -390,4 +390,169 @@ class RenderFuzzTest {
         failures.forEach { println("FAIL $it") }
         assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
+
+    // ------------------------------------------------------------------ updater
+    private fun updaterRelease(tag: String, digest: String?, withSumFile: Boolean = true) = """
+        {"tag_name":"$tag","name":"Open Arcade $tag","draft":false,"prerelease":false,"html_url":"https://github.com/x/y",
+         "body":"- New automatic updates\n- Better chess pieces\n\n---\nInstall stuff",
+         "assets":[{"name":"OpenArcade-$tag.apk","size":4,"browser_download_url":"https://dl/OpenArcade-$tag.apk"${if (digest != null) ""","digest":"sha256:$digest"""" else ""}}
+         ${if (withSumFile) """,{"name":"OpenArcade-$tag.apk.sha256","size":88,"browser_download_url":"https://dl/OpenArcade-$tag.apk.sha256"}""" else ""}]}
+    """.trimIndent()
+
+    private fun waitIdle() {
+        var k = 0
+        val busy = setOf(com.openarcade.update.UpdateManager.Phase.CHECKING, com.openarcade.update.UpdateManager.Phase.DOWNLOADING,
+            com.openarcade.update.UpdateManager.Phase.VERIFYING, com.openarcade.update.UpdateManager.Phase.INSTALLING)
+        Thread.sleep(50)
+        while (com.openarcade.update.UpdateManager.state.phase in busy && k++ < 200) Thread.sleep(25)
+        Thread.sleep(50)
+    }
+
+    @Test fun updaterChecksOnlyOnWifi() {
+        val um = com.openarcade.update.UpdateManager
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val cfg = com.openarcade.update.AppUpdateConfig.CONFIG
+        val http = FakeHttp(mapOf(cfg.latestReleaseUrl to { _ -> FakeHttp.json(updaterRelease("v9.0.0", "a".repeat(64))) }))
+        var wifi = false
+        um.init(ctx, cfg, http) { wifi }
+        um.installedVersionOverride = "1.2.0"
+        um.checkOnLaunch(); waitIdle()
+        assertTrue("no network use off Wi-Fi", http.requests.isEmpty())
+        um.check(manual = true)
+        assertTrue(um.state.phase == com.openarcade.update.UpdateManager.Phase.NO_WIFI && http.requests.isEmpty())
+        wifi = true
+        um.checkOnLaunch(); waitIdle()
+        assertTrue(um.state.phase == com.openarcade.update.UpdateManager.Phase.AVAILABLE)
+        assertTrue(um.autoPopupPending)
+        assertTrue(um.state.release!!.notes == "- New automatic updates\n- Better chess pieces")
+        // skipping silences automatic offers of that version
+        um.skip(); um.autoPopupPending = false
+        um.checkOnLaunch(); waitIdle()
+        assertTrue(um.state.phase == com.openarcade.update.UpdateManager.Phase.IDLE && !um.autoPopupPending)
+        // ...but a manual check still shows it
+        um.check(manual = true); waitIdle()
+        assertTrue(um.state.phase == com.openarcade.update.UpdateManager.Phase.AVAILABLE)
+        // up to date
+        um.installedVersionOverride = "9.0.0"
+        um.check(manual = true); waitIdle()
+        assertTrue(um.state.phase == com.openarcade.update.UpdateManager.Phase.UP_TO_DATE)
+        um.installedVersionOverride = null
+    }
+
+    @Test fun updaterBacksOffWhenRateLimited() {
+        val um = com.openarcade.update.UpdateManager
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val cfg = com.openarcade.update.AppUpdateConfig.CONFIG
+        val reset = System.currentTimeMillis() / 1000 + 3600
+        val http = FakeHttp(mapOf(cfg.latestReleaseUrl to { _ ->
+            FakeHttp.ok(ByteArray(0), 403, mapOf("x-ratelimit-remaining" to "0", "x-ratelimit-reset" to reset.toString())) }))
+        um.init(ctx, cfg, http) { true }
+        um.checkOnLaunch(); waitIdle()
+        assertTrue(um.state.phase == com.openarcade.update.UpdateManager.Phase.IDLE)   // automatic: silent
+        um.checkOnLaunch(); waitIdle()
+        assertTrue("second launch waits for the rate-limit reset", http.requests.size == 1)
+        um.check(manual = true); waitIdle()
+        assertTrue(um.state.phase == com.openarcade.update.UpdateManager.Phase.ERROR && um.state.message.contains("BUSY"))
+        ctx.getSharedPreferences("app_updates", 0).edit().clear().apply()
+    }
+
+    @Test fun updaterRejectsBadDownloads() {
+        val um = com.openarcade.update.UpdateManager
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val cfg = com.openarcade.update.AppUpdateConfig.CONFIG
+        val apk = byteArrayOf(1, 2, 3, 4)   // not a real APK
+        val good = java.security.MessageDigest.getInstance("SHA-256").digest(apk).joinToString("") { "%02x".format(it) }
+        fun run(json: String, extra: Map<String, (Map<String, String>) -> com.openarcade.update.HttpClient.Response> = emptyMap()): com.openarcade.update.UpdateManager.State {
+            val http = FakeHttp(mapOf(cfg.latestReleaseUrl to { _: Map<String, String> -> FakeHttp.json(json) },
+                "https://dl/OpenArcade-v9.0.0.apk" to FakeHttp.ranged(apk)) + extra)
+            um.init(ctx, cfg, http) { true }
+            um.installedVersionOverride = "1.2.0"
+            um.check(manual = true); waitIdle()
+            um.download(); waitIdle()
+            return um.state
+        }
+        // wrong checksum -> rejected, file removed
+        var st = run(updaterRelease("v9.0.0", "b".repeat(64)))
+        assertTrue(st.phase == com.openarcade.update.UpdateManager.Phase.ERROR && st.message.contains("CHECKSUM"))
+        assertTrue(!java.io.File(um.updatesDir, "OpenArcade-v9.0.0.apk").exists())
+        // right checksum but not a genuine signed APK of this app -> rejected, file removed
+        st = run(updaterRelease("v9.0.0", good))
+        assertTrue(st.phase == com.openarcade.update.UpdateManager.Phase.ERROR)
+        println("invalid apk rejected with: ${st.message}")
+        assertTrue(!java.io.File(um.updatesDir, "OpenArcade-v9.0.0.apk").exists())
+        // no checksum published anywhere -> refuse to download
+        st = run(updaterRelease("v9.0.0", null, withSumFile = false))
+        assertTrue(st.phase == com.openarcade.update.UpdateManager.Phase.ERROR && st.message.contains("CHECKSUM"))
+        // checksum from the .sha256 asset is used when GitHub has no digest
+        st = run(updaterRelease("v9.0.0", null), mapOf("https://dl/OpenArcade-v9.0.0.apk.sha256" to { _ -> FakeHttp.json("$good  OpenArcade-v9.0.0.apk") }))
+        assertTrue(st.phase == com.openarcade.update.UpdateManager.Phase.ERROR && !st.message.contains("CHECKSUM"))
+        um.installedVersionOverride = null
+    }
+
+    @Test fun updaterCleansUpOldDownloads() {
+        val um = com.openarcade.update.UpdateManager
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val dir = java.io.File(ctx.cacheDir, "updates").apply { mkdirs() }
+        java.io.File(dir, "OpenArcade-v1.0.0.apk").writeText("old")
+        java.io.File(dir, "OpenArcade-v1.1.0.apk.part").writeText("old part")
+        java.io.File(dir, "OpenArcade-v99.0.0.apk").writeText("future")
+        um.init(ctx, com.openarcade.update.AppUpdateConfig.CONFIG, FakeHttp(emptyMap())) { false }
+        assertTrue(!java.io.File(dir, "OpenArcade-v1.0.0.apk").exists())
+        assertTrue(!java.io.File(dir, "OpenArcade-v1.1.0.apk.part").exists())
+        assertTrue(java.io.File(dir, "OpenArcade-v99.0.0.apk").exists())
+        dir.deleteRecursively()
+    }
+
+    @Test fun updatePopupOnlyOnHomeScreenAndScreenshots() {
+        val um = com.openarcade.update.UpdateManager
+        val ctx: android.content.Context = org.robolectric.RuntimeEnvironment.getApplication()
+        val cfg = com.openarcade.update.AppUpdateConfig.CONFIG
+        um.init(ctx, cfg, FakeHttp(emptyMap())) { true }
+        val rel = com.openarcade.update.GitHubReleases.parseRelease(updaterRelease("v1.3.0", "a".repeat(64)).replace("\"size\":4", "\"size\":215040"), cfg)!!
+        val app = ArcadeApp(ctx) {}
+        app.resize(1080, 2340)
+        val bmp = Bitmap.createBitmap(1080, 2340, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        app.storage.setTutorialSeen("snake")
+        val gs = com.openarcade.ui.screens.GameScreen(app, GameRegistry.byId("snake")!!)
+        app.replaceAll(gs, animate = false)
+        gs.startRoundForTest()
+        um.setStateForTest(com.openarcade.update.UpdateManager.State(com.openarcade.update.UpdateManager.Phase.AVAILABLE, rel))
+        um.autoPopupPending = true
+        repeat(5) { app.frame(c) }
+        assertTrue("never interrupts gameplay", app.top === gs && um.autoPopupPending)
+        app.replaceAll(com.openarcade.ui.screens.HomeScreen(app), animate = false)
+        repeat(5) { app.frame(c) }
+        assertTrue("offered on the home screen", app.top is com.openarcade.ui.screens.UpdateScreen && !um.autoPopupPending)
+        app.destroy()
+        // screenshots of each dialog state on phone and tablet
+        val states = listOf(
+            "available" to com.openarcade.update.UpdateManager.State(com.openarcade.update.UpdateManager.Phase.AVAILABLE, rel),
+            "downloading" to com.openarcade.update.UpdateManager.State(com.openarcade.update.UpdateManager.Phase.DOWNLOADING, rel, 131072, 215040),
+            "ready" to com.openarcade.update.UpdateManager.State(com.openarcade.update.UpdateManager.Phase.READY, rel),
+            "error" to com.openarcade.update.UpdateManager.State(com.openarcade.update.UpdateManager.Phase.ERROR, rel, message = "CHECKSUM MISMATCH - THE DOWNLOAD IS CORRUPTED"),
+            "nowifi" to com.openarcade.update.UpdateManager.State(com.openarcade.update.UpdateManager.Phase.NO_WIFI),
+        )
+        for ((tag, size, dpi) in listOf(Triple("phone-port", 1080 to 2340, "420dpi"), Triple("tablet-land", 2560 to 1600, "xhdpi"))) {
+            org.robolectric.RuntimeEnvironment.setQualifiers("+$dpi")
+            val a2 = ArcadeApp(ctx) {}
+            a2.resize(size.first, size.second)
+            val b2 = Bitmap.createBitmap(size.first, size.second, Bitmap.Config.ARGB_8888)
+            val c2 = Canvas(b2)
+            a2.replaceAll(com.openarcade.ui.screens.HomeScreen(a2), animate = false)
+            for ((name, st) in states) {
+                um.setStateForTest(st)
+                val us = com.openarcade.ui.screens.UpdateScreen(a2)
+                a2.pushOverlay(us)
+                repeat(3) { a2.frame(c2) }
+                save(b2, "screen-$tag-update-$name")
+                a2.popOverlay(us)
+            }
+            a2.push(com.openarcade.ui.screens.SettingsScreen(a2), animate = false)
+            repeat(3) { a2.frame(c2) }
+            save(b2, "screen-$tag-settings-updates")
+            a2.destroy()
+        }
+        um.setStateForTest(com.openarcade.update.UpdateManager.State(com.openarcade.update.UpdateManager.Phase.IDLE))
+    }
 }
