@@ -61,6 +61,11 @@ class AudioEngine {
         if (track.state != AudioTrack.STATE_INITIALIZED) { track.release(); running = false; return }
 
         val chunk = 512
+        // After the last sound, keep streaming silence for longer than the track's buffer so
+        // queued effects actually reach the speaker before the track is paused.
+        val bufferFrames = maxOf(minBuf, 2048) * 2 / 2
+        val tailFrames = bufferFrames * 2 + rate / 4
+        var silentFrames = Int.MAX_VALUE
         val out = ShortArray(chunk)
         val voices = ArrayList<Voice>()
         var song: Song? = null
@@ -87,9 +92,15 @@ class AudioEngine {
                     continue
                 }
 
-                val idle = !active || (gain <= 0.0005f && target == 0f && voices.isEmpty())
+                val quiet = gain <= 0.0005f && target == 0f && voices.isEmpty()
+                if (!quiet) silentFrames = 0
+                val idle = !active || (quiet && silentFrames >= tailFrames)
                 if (idle) {
-                    if (playing) { track.pause(); track.flush(); playing = false }
+                    if (playing) {
+                        track.pause()
+                        if (!active) track.flush()   // app in background: drop whatever is queued
+                        playing = false
+                    }
                     if (!active) voices.clear()
                     try { Thread.sleep(30) } catch (e: InterruptedException) { /* loop */ }
                     continue
@@ -119,6 +130,7 @@ class AudioEngine {
                     out[i] = (x * 32000f).toInt().toShort()
                 }
                 track.write(out, 0, chunk)
+                if (quiet && silentFrames < Int.MAX_VALUE - chunk) silentFrames += chunk
                 // keep at most a few overlapping copies of effects to avoid harsh stacking
                 while (voices.size > 8) voices.removeAt(0)
             }

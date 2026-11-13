@@ -32,11 +32,14 @@ class PixelArt(rows: List<String>, private val colors: Map<Char, Int> = DEFAULT_
     }
 
     fun draw(c: Canvas, dst: RectF, alpha: Int = 255, tint: Int? = null) {
+        // Snap to whole screen pixels: fractional positions make nearest-neighbour scaling pick
+        // different source rows/columns each frame, which looks like the sprite twitching.
+        snapped.set(kotlin.math.round(dst.left), kotlin.math.round(dst.top), kotlin.math.round(dst.right), kotlin.math.round(dst.bottom))
         paint.alpha = alpha
         paint.colorFilter = if (tint == null) null else tints.getOrPut(tint) {
             android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.MULTIPLY)
         }
-        c.drawBitmap(bitmap(), null, dst, paint)
+        c.drawBitmap(bitmap(), null, snapped, paint)
     }
 
     /** Draws the sprite centred inside [box], scaled by the largest whole factor that fits. */
@@ -45,7 +48,10 @@ class PixelArt(rows: List<String>, private val colors: Map<Char, Int> = DEFAULT_
         val fs = if (s * w > box.width() || s * h > box.height()) minOf(box.width() / w, box.height() / h) else s
         val dw = w * fs
         val dh = h * fs
-        tmp.set(box.centerX() - dw / 2, box.centerY() - dh / 2, box.centerX() + dw / 2, box.centerY() + dh / 2)
+        // keep the sprite's size constant while it moves: snap the corner, then add the size
+        val l = kotlin.math.round(box.centerX() - dw / 2)
+        val t = kotlin.math.round(box.centerY() - dh / 2)
+        tmp.set(l, t, l + kotlin.math.round(dw), t + kotlin.math.round(dh))
         draw(c, tmp, alpha, tint)
     }
 
@@ -57,6 +63,7 @@ class PixelArt(rows: List<String>, private val colors: Map<Char, Int> = DEFAULT_
     companion object {
         private val paint = Paint().apply { isFilterBitmap = false; isAntiAlias = false }
         private val tmp = RectF()
+        private val snapped = RectF()
         private val tints = HashMap<Int, android.graphics.PorterDuffColorFilter>()
 
         /** Shared character → colour mapping used by most sprites. */

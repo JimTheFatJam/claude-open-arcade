@@ -13,6 +13,18 @@ object Icons {
         "...W.....",
         ".........",
     )
+    /** Mirror of [BACK]. */
+    val FORWARD = PixelArt(
+        ".........",
+        ".....W...",
+        ".....WW..",
+        ".WWWWWWW.",
+        ".WWWWWWWW",
+        ".WWWWWWW.",
+        ".....WW..",
+        ".....W...",
+        ".........",
+    )
     val MUSIC = PixelArt(
         "...WWWWW.",
         "...WWWWW.",

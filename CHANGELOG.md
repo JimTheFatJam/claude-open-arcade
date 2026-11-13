@@ -2,6 +2,11 @@
 
 Each `## [x.y.z]` section becomes the release notes on GitHub and is shown in the in-app updater.
 
+## [1.2.1]
+- Fixed: turning the music off no longer silences the sound effects.
+- Fixed: game logos and pixel art no longer twitch while they gently bob.
+- The "next featured game" arrow on the home screen now matches the "previous" arrow.
+
 ## [1.2.0]
 - New: automatic updates. On launch (Wi-Fi only) the game checks GitHub for a new version and offers it on the home screen.
 - Updates are downloaded in the background, verified (checksum and developer signature) and installed with Android's own installer.

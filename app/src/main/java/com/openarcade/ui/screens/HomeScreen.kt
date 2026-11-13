@@ -81,7 +81,7 @@ class HomeScreen(app: ArcadeApp) : Screen(app) {
             val ab = p * 14
             buttons.add(Button("", Icons.BACK, Pal.BG3) { featIndex = (featIndex + featured.size - 1) % featured.size; rebuild() })
                 .set(featBox.left + p * 5, featBox.bottom - p * 21, featBox.left + p * 5 + ab, featBox.bottom - p * 7)
-            buttons.add(Button("", Icons.PLAY, Pal.BG3) { featIndex = (featIndex + 1) % featured.size; rebuild() })
+            buttons.add(Button("", Icons.FORWARD, Pal.BG3) { featIndex = (featIndex + 1) % featured.size; rebuild() })
                 .set(featBox.left + p * 8 + ab, featBox.bottom - p * 21, featBox.left + p * 8 + ab * 2, featBox.bottom - p * 7)
         }
         y = featBox.bottom + p * 8
