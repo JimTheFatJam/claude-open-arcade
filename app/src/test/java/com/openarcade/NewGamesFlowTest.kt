@@ -188,7 +188,9 @@ class NewGamesFlowTest {
         s.layout(area); s.start(saved); s.layout(area)
         assertTrue(s.placeForTest(0, 7, 0))
         assertTrue("row cleared", (0 until 8).all { s.boardForTest.get(it, 0) == 0 })
-        assertEquals(1 + 10, s.scoreForTest)
+        // 1 point for the square, 10 for the line, and the row was all that was on the board: +300 board clear
+        assertEquals(1 + 10 + 300, s.scoreForTest)
+        assertTrue(s.boardForTest.empty)
         // blocks can't overlap: square (1,1) is taken
         s.boardForTest.cells[9] = 1
         assertFalse(s.placeForTest(1, 1, 1))
@@ -250,6 +252,7 @@ class NewGamesFlowTest {
             s.startFlowForTest()
             var k = 0
             while (!s.finished && k++ < 60 * 400) { s.step(1 / 60f); if (k % 300 == 0) s.draw(c) }
+            repeat(180) { s.step(1 / 60f) }      // the result is reported after the ending animation
             assertTrue("$d drained", host.result?.won == true)
             assertTrue(host.ints["unlocked_${d.ordinal}"] == 2)
             // nothing built: the water spills out of the tank's opening
@@ -258,6 +261,7 @@ class NewGamesFlowTest {
             s2.layout(area); s2.start(null); s2.startFlowForTest()
             k = 0
             while (!s2.finished && k++ < 60 * 60) s2.step(1 / 60f)
+            repeat(180) { s2.step(1 / 60f) }
             assertTrue(h2.result?.won == false)
             assertEquals("LEAK!", h2.result?.title)
         }
