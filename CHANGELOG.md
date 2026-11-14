@@ -2,6 +2,13 @@
 
 Each `## [x.y.z]` section becomes the release notes on GitHub and is shown in the in-app updater.
 
+## [1.3.0]
+- New: ROLL BLOCK - tip a tall block across floating tiles into the hole. 24 levels with fragile tiles, switches and bridges.
+- New: BLOCK FIT - place blocks on an 8x8 grid and clear full rows and columns for combos.
+- New: CRATE PUSH - push every crate onto a goal. 24 levels with unlimited undo.
+- New: PIPE RUSH - lay pipes from IN to OUT before the water starts flowing. 12 levels per difficulty.
+- Every new game has an interactive tutorial, saved progress and achievements.
+
 ## [1.2.1]
 - Fixed: turning the music off no longer silences the sound effects.
 - Fixed: game logos and pixel art no longer twitch while they gently bob.
