@@ -129,7 +129,10 @@ object PipeArt {
             val k = maxOf(1f, floor(cell / 12f))
             for (j in 1..3) Gfx.rect(c, box.left + k * 2, box.top + box.height() * j / 4f, box.right - k * 2, box.top + box.height() * j / 4f + k, Pal.BLACK)
         }
-        Gfx.textMid(c, if (source) "IN" else "OUT", r.centerX(), r.centerY(), maxOf(1f, floor(cell / 14f)), Pal.WHITE)
+        // label sized to sit inside the tank / drain box
+        val label = if (source) "IN" else "OUT"
+        val ts = floor(Gfx.fitSize(label, box.width() * 0.8f, cell / 14f))
+        if (ts >= 1f) Gfx.textMid(c, label, r.centerX(), r.centerY(), ts, Pal.WHITE)
     }
 
     fun queuePiece(c: Canvas, r: RectF, kind: Int, rot: Int, cell: Float) {
@@ -213,12 +216,12 @@ class PipeSession(host: GameHost) : GameSession(host) {
             val boardBox = RectF(area.left, area.top, area.right - qw - p * 4, area.bottom - textH)
             grid.fit(boardBox, p * 3)
             queueBox.set(grid.bounds.right + p * 6, grid.bounds.top, grid.bounds.right + p * 6 + qw, grid.bounds.bottom)
-            val qc = floor(minOf(qw - p * 4, (queueBox.height() - p * 10) / (QUEUE + 0.6f)))
+            val qc = floor(minOf(qw - p * 4, (queueBox.height() - p * 30) / (1.3f + 0.9f * (QUEUE - 1))))
             var y = queueBox.top + p * 8
             for (k in 0 until QUEUE) {
                 val s = if (k == 0) qc * 1.3f else qc * 0.9f
                 queueCells[k].set(floor(queueBox.centerX() - s / 2), floor(y), floor(queueBox.centerX() + s / 2), floor(y + s))
-                y += s + p * 2
+                y += s + p * 5
             }
         } else {
             val qh = minOf(area.height() * 0.14f, p * 30)
@@ -226,12 +229,12 @@ class PipeSession(host: GameHost) : GameSession(host) {
             val boardBox = RectF(area.left, queueBox.bottom + p * 2, area.right, area.bottom - textH)
             grid.fit(boardBox, p * 3)
             queueBox.left = grid.bounds.left; queueBox.right = grid.bounds.right
-            val qc = floor(minOf(qh - p * 8, (queueBox.width() - p * 26) / (QUEUE + 0.6f)))
+            val qc = floor(minOf((qh - p * 6) / 1.25f, (queueBox.width() - p * 46) / (1.25f + 0.85f * (QUEUE - 1))))
             var x = queueBox.left + p * 24
             for (k in 0 until QUEUE) {
                 val s = if (k == 0) qc * 1.25f else qc * 0.85f
                 queueCells[k].set(floor(x), floor(queueBox.bottom - p * 2 - s), floor(x + s), floor(queueBox.bottom - p * 2))
-                x += s + p * 2
+                x += s + p * 5
             }
         }
     }
