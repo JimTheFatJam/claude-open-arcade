@@ -23,6 +23,10 @@ object GameRegistry {
             com.openarcade.games.invaders.AlienInvasionGame,
             com.openarcade.games.chess.ChessGame,
             com.openarcade.games.checkers.CheckersGame,
+            com.openarcade.games.rollblock.RollBlockGame,
+            com.openarcade.games.blockfit.BlockFitGame,
+            com.openarcade.games.crate.CratePushGame,
+            com.openarcade.games.pipe.PipeRushGame,
         )
     }
 

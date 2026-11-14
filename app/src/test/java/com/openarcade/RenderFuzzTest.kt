@@ -148,9 +148,19 @@ class RenderFuzzTest {
             app.push(com.openarcade.ui.screens.SettingsScreen(app), animate = false); shot("settings"); app.pop(false)
             app.push(com.openarcade.ui.screens.StatsScreen(app), animate = false); shot("stats"); app.pop(false)
             app.push(com.openarcade.ui.screens.AchievementsScreen(app), animate = false); shot("awards"); app.pop(false)
-            for (id in listOf("meowdoku", "sudoku", "chess", "tetromino", "minesweeper", "2048", "flowlink", "mazemuncher", "nonogram")) {
+            val newGames = listOf("rollblock", "blockfit", "cratepush", "piperush")
+            for (id in listOf("meowdoku", "sudoku", "chess", "tetromino", "minesweeper", "2048", "flowlink", "mazemuncher", "nonogram") + newGames) {
                 val gs = com.openarcade.ui.screens.GameScreen(app, GameRegistry.byId(id)!!)
                 app.push(gs, animate = false); shot("$id-menu")
+                if (id in newGames && (tag == "phone-port" || tag == "tablet-land")) {
+                    for (k in gs.def.tutorial.indices) {
+                        val ts = com.openarcade.ui.screens.TutorialScreen(app, gs.def) {}
+                        app.pushOverlay(ts)
+                        repeat(k) { ts.javaClass.getDeclaredMethod("next").apply { isAccessible = true }.invoke(ts) }
+                        shot("$id-tutorial-$k", 20)
+                        app.popOverlay(ts)
+                    }
+                }
                 if (id == "meowdoku") {
                     for (k in gs.def.tutorial.indices) {
                         val ts = com.openarcade.ui.screens.TutorialScreen(app, gs.def) {}
@@ -172,6 +182,27 @@ class RenderFuzzTest {
                         s.onTouch(ev(MotionEvent.ACTION_DOWN, x, y)); s.onTouch(ev(MotionEvent.ACTION_UP, x, y))
                     }
                     s.actions().first { it.label == "HINT" }.onClick()
+                }
+                if (id in newGames) {
+                    // play a few moves so the screenshot shows the game in action
+                    val s = gs.sessionForTest!!
+                    when (s) {
+                        is com.openarcade.games.rollblock.RollSession -> s.levelForTest.solve()!!.take(3).forEach { s.rollForTest(it) }
+                        is com.openarcade.games.crate.CrateSession -> listOf(0, 2, 0, 3).forEach { s.moveForTest(it) }
+                        is com.openarcade.games.blockfit.BlockFitSession -> repeat(2) {
+                            val slot = (0 until 3).first { k -> s.trayForTest[k] != null }
+                            val sh = s.trayForTest[slot]!!
+                            // fill from the bottom row upwards
+                            (63 downTo 0).firstOrNull { k -> s.boardForTest.fits(sh, k % 8, k / 8) }?.let { k -> s.placeForTest(slot, k % 8, k / 8) }
+                        }
+                        is com.openarcade.games.pipe.PipeSession -> {
+                            val lv = s.levelForTest
+                            lv.route.withIndex().take(lv.route.size / 2).forEach { (i, cell) -> if (!lv.fixed[cell]) s.placeForTest(cell, lv.routeMasks[i]) }
+                            s.startFlowForTest()
+                        }
+                        else -> {}
+                    }
+                    repeat(if (s is com.openarcade.games.pipe.PipeSession) 120 else 20) { app.frame(c); Thread.sleep(12) }
                 }
                 shot("$id-play", 10)
                 if (id == "meowdoku") {

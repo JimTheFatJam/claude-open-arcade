@@ -85,3 +85,38 @@ fun drawBoardFrame(c: Canvas, r: RectF, p: Float, accent: Int) {
 fun IntArray.toJsonArray(): org.json.JSONArray = org.json.JSONArray().also { a -> forEach { a.put(it) } }
 
 fun org.json.JSONArray.toIntArray(): IntArray = IntArray(length()) { optInt(it) }
+
+/**
+ * Level-pack progress for level-based games, kept per difficulty in the game's own storage: the
+ * level to play next, how many levels are unlocked, and the best result for every level.
+ */
+class LevelTrack(private val host: GameHost, val count: Int) {
+    private val d = host.difficulty.ordinal
+
+    /** Levels the player may choose from (always at least the first). */
+    val unlocked: Int get() = host.getInt("unlocked_$d", 1).coerceIn(1, count)
+
+    /** The level a new round starts on. */
+    var current: Int
+        get() = host.getInt("level_$d", 0).coerceIn(0, unlocked - 1)
+        set(v) = host.putInt("level_$d", v.coerceIn(0, unlocked - 1))
+
+    /** Number of different levels completed at least once. */
+    val cleared: Int get() = (0 until count).count { best(it) > 0 }
+
+    /** Best (lowest) move count for [level], or 0 when it was never completed. */
+    fun best(level: Int): Int = host.getInt("best_${d}_$level", 0)
+
+    /**
+     * Records a completed level: keeps the best move count, unlocks the next level and makes it the
+     * current one (wrapping to the first after the last). Returns true for a new best.
+     */
+    fun complete(level: Int, moves: Int): Boolean {
+        val old = best(level)
+        val newBest = old == 0 || moves < old
+        if (newBest) host.putInt("best_${d}_$level", maxOf(1, moves))
+        if (level + 2 > unlocked) host.putInt("unlocked_$d", minOf(count, level + 2))
+        current = if (level + 1 < count) level + 1 else 0
+        return newBest
+    }
+}
